@@ -1,6 +1,12 @@
 (async function scoredpCrawler() {
   'use strict';
 
+  if (window._scoredpRunning) {
+    alert('이미 실행 중입니다.');
+    return;
+  }
+  window._scoredpRunning = true;
+
   // API base URL 우선순위:
   //   1) window._scoredpApiBase  (콘솔 직접 실행 시 수동 지정)
   //   2) 스크립트 태그의 data-api  (북마클릿 방식)
@@ -23,11 +29,11 @@
 
   const overlay = document.createElement('div');
   overlay.style.cssText = [
-    'position:fixed', 'top:50%', 'left:50%', 'transform:translate(-50%,-50%)',
+    'position:fixed', 'bottom:16px', 'left:16px', 'right:16px',
     'background:rgba(0,0,0,0.88)', 'color:#fff',
     'padding:12px 16px', 'border-radius:8px',
     'font:13px/1.6 sans-serif', 'z-index:2147483647',
-    'max-width:360px', 'word-break:break-all',
+    'word-break:break-all',
     'box-shadow:0 4px 12px rgba(0,0,0,0.4)',
     'white-space:pre-line',
   ].join(';');
@@ -42,6 +48,7 @@
     overlay.style.background = 'rgba(180,30,30,0.92)';
     overlay.textContent = msg;
     console.error('[scoredp]', msg);
+    window._scoredpRunning = false;
   }
 
   // ── 사용자 정보 자동 수집 ─────────────────────────────────────────────────────
@@ -204,5 +211,5 @@
   }
 
   log(`완료!\n업데이트: ${result.updated}개 / 수집: ${allScores.length}개`);
-  setTimeout(() => overlay.remove(), 8000);
+  setTimeout(() => { overlay.remove(); window._scoredpRunning = false; }, 8000);
 })();
