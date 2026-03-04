@@ -96,6 +96,24 @@
     return;
   }
 
+  // ── e-amusement 베이직 코스 가입 확인 ────────────────────────────────────────────
+
+  try {
+    const courseRes = await fetch(
+      '/payment/p/ex_select_course.html',
+      { credentials: 'same-origin' }
+    );
+    const courseDoc = new DOMParser().parseFromString(await courseRes.text(), 'text/html');
+    const isSubscribed = !!courseDoc.querySelector('[data-course="eaBASIC"] .cl_course_continuous');
+    if (!isSubscribed) {
+      logError('e-amusement 베이직 코스 가입자만 이용할 수 있습니다.');
+      return;
+    }
+  } catch (e) {
+    logError(`코스 확인 오류: ${e.message}`);
+    return;
+  }
+
   log(`IIDX ID: ${iidxId}\nDJ NAME: ${djName}\n\n수집을 시작합니다.`);
   await new Promise(r => setTimeout(r, 800));
 
