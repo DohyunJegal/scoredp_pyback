@@ -15,7 +15,7 @@ class Song(Base):
     id = Column(Integer, primary_key=True)
     zasa_id = Column(String, nullable=True)       # "01010" - 버전 포함
     title = Column(String, nullable=False)
-    title_normalized = Column(String, nullable=False)  # 정규화된 곡명 (매칭용)
+    title_normalized = Column(String, nullable=False, index=True)  # 정규화된 곡명 (매칭용)
     level = Column(Integer, nullable=False)
     chart = Column(String, nullable=False)        # HYPER/ANOTHER/LEGGENDARIA
     unofficial_level = Column(Float, nullable=True)
@@ -24,8 +24,8 @@ class Song(Base):
 class Score(Base):
     __tablename__ = "scores"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    song_id = Column(Integer, ForeignKey("songs.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    song_id = Column(Integer, ForeignKey("songs.id"), nullable=False, index=True)
     clear_type = Column(Integer, default=0)  # 0=NO PLAY 1=FAILED 2=CLEAR 3=HARD 4=EX_HARD 5=FC
     score = Column(Integer, default=0)
     dj_level = Column(String, default="---")
