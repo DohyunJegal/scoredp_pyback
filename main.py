@@ -30,7 +30,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/c")
 def get_crawler(request: Request):
-    api_base = str(request.base_url).rstrip("/").replace("http://", "https://")
+    api_base = str(request.base_url).rstrip("/")
+    if not api_base.startswith("http://127.") and not api_base.startswith("http://localhost"):
+        api_base = api_base.replace("http://", "https://")
     with open("static/crawler.js", encoding="utf-8") as f:
         js = f.read()
     js = f"window._scoredpApiBase='{api_base}';\n" + js
