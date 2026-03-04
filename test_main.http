@@ -1,0 +1,75 @@
+### 서버 실행: .venv/Scripts/uvicorn main:app --reload
+### Swagger UI:  http://127.0.0.1:8000/docs
+
+@base = http://127.0.0.1:8000
+
+# ────────────────────────────────────────────────────────────────
+# 곡 목록 조회 (DB에 데이터 있는지 확인)
+# ────────────────────────────────────────────────────────────────
+
+GET {{base}}/admin/songs
+Accept: application/json
+
+###
+
+# ────────────────────────────────────────────────────────────────
+# 스코어 업로드 (크롤러가 보내는 형식)
+# ────────────────────────────────────────────────────────────────
+
+POST {{base}}/upload
+Content-Type: application/json
+
+{
+  "iidx_id": "1234-5678",
+  "dj_name": "test",
+  "scores": [
+    {
+      "title": "THE EARTH LIGHT",
+      "chart": "ANOTHER",
+      "level": 10,
+      "clear_type": 4,
+      "score": 1800,
+      "dj_level": "AA"
+    },
+    {
+      "title": "ICARUS",
+      "chart": "ANOTHER",
+      "level": 12,
+      "clear_type": 5,
+      "score": 2500,
+      "dj_level": "AAA"
+    }
+  ]
+}
+
+###
+
+# ────────────────────────────────────────────────────────────────
+# 유저 스코어 조회
+# ────────────────────────────────────────────────────────────────
+
+GET {{base}}/scores/7930-1798
+Accept: application/json
+
+###
+
+# 레벨 필터
+GET {{base}}/scores/7930-1798?level=12
+Accept: application/json
+
+###
+
+# ────────────────────────────────────────────────────────────────
+# 곡 단건 추가
+# ────────────────────────────────────────────────────────────────
+
+POST {{base}}/admin/songs
+Content-Type: application/json
+
+{
+  "title": "テスト曲",
+  "level": 10,
+  "chart": "ANOTHER"
+}
+
+###
