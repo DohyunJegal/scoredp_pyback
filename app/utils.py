@@ -7,6 +7,7 @@ _ALIASES: dict[str, str] = {
     'CODE:Ø': 'CODE:0',
     'ÆTHER': 'ATHER',
     'BLO§OM': 'BLOSSOM',
+    '火影': '焱影',
 }
 
 # NFKD로 분해되지 않는 유사자 치환 테이블
