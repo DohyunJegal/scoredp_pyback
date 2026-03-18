@@ -195,6 +195,12 @@
 
   // ── 서버에 전송 ──────────────────────────────────────────────────────────────
 
+  if (allScores.length === 0) {
+    log('수집된 스코어가 없습니다.\n');
+    setTimeout(() => { overlay.remove(); window._scoredpRunning = false; }, 5000);
+    return;
+  }
+
   log(`총 ${allScores.length}개 수집 완료.\n서버에 전송 중...`);
 
   let result;
