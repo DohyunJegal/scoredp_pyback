@@ -256,3 +256,42 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
     return {"message": "삭제 완료"}
+
+
+# 유저 스코어 목록
+@router.get("/admin/users/{user_id}/scores")
+def get_user_scores(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다")
+    scores = (
+        db.query(Score, Song)
+        .join(Song, Score.song_id == Song.id)
+        .filter(Score.user_id == user_id, Score.clear_type > 0)
+        .order_by(Song.level, Song.chart, Song.title)
+        .all()
+    )
+    return [
+        {
+            "id": sc.id,
+            "song_title": sg.title,
+            "chart": sg.chart,
+            "level": sg.level,
+            "clear_type": sc.clear_type,
+            "score": sc.score,
+            "dj_level": sc.dj_level,
+            "updated_at": sc.updated_at,
+        }
+        for sc, sg in scores
+    ]
+
+
+# 스코어 단건 삭제
+@router.delete("/admin/scores/{score_id}")
+def delete_score(score_id: int, db: Session = Depends(get_db)):
+    score = db.query(Score).filter(Score.id == score_id).first()
+    if not score:
+        raise HTTPException(status_code=404, detail="스코어를 찾을 수 없습니다")
+    db.delete(score)
+    db.commit()
+    return {"message": "삭제 완료"}
