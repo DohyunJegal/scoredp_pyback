@@ -36,7 +36,8 @@ def upload_scores(data: UploadRequest, db: Session = Depends(get_db)):
         normalized = normalize_title(item.title)
         song = db.query(Song).filter(
             Song.title_normalized == normalized,
-            Song.chart == item.chart
+            Song.chart == item.chart,
+            Song.level == item.level
         ).first()
         if not song:
             logger.warning(
