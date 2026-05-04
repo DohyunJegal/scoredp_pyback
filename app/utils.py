@@ -9,8 +9,8 @@ _ALIASES: dict[str, str] = {
     'BLO§OM': 'BLOSSOM',
     '火影': '焱影',
     "POLꓘAMAИIA": "POLꞰAMAИIA",
-    "FiZZλ_POT!0N": "FiZZλ_PØT!0И",
-    "Τeλοs": "Τέλος"
+    "Τeλοs": "Τέλος",
+    "ZEИITH": "zenith2"
 }
 
 # NFKD로 분해되지 않는 유사자 치환 테이블
@@ -24,7 +24,7 @@ _TRANS = str.maketrans({
     'Χ': 'X', 'χ': 'x', # 그리스 Chi (Χ-DEN → X-DEN)
     'ƒ': 'f', # ƒƒƒƒƒ → fffff
     '<': '', '>': '',
-    # 'И': 'N', # 키릴 И (Zenith, ZEИITH 구분을 위해 주석처리)
+    'И': 'N', # 키릴 И
 })
 
 
@@ -41,7 +41,7 @@ def normalize_title(title: str) -> str:
     title = title.lower()
     # 6. 공백, 기호, 특문 등 제거
     title = re.sub(
-        r"[\s\-_.'\u2019\"\u201c\u201d()~\u301c\uff5e\u2661\u2665"
+        r"[\s\t\-_.'\u2019\"\u201c\u201d()~\u301c\uff5e\u2661\u2665"
         r"\u266a\u266b\u266c"   # ♪♫♬
         r"\u300a\u300b"         # 《》
         r"\u30fb\u00b7"         # ・ (가타카나 중점), · (중간점)
