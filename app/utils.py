@@ -9,6 +9,8 @@ _ALIASES: dict[str, str] = {
     'BLO§OM': 'BLOSSOM',
     '火影': '焱影',
     "POLꓘAMAИIA": "POLꞰAMAИIA",
+    "FiZZλ_POT!0N": "FiZZλ_PØT!0И",
+    "Τeλοs": "Τέλος"
 }
 
 # NFKD로 분해되지 않는 유사자 치환 테이블
