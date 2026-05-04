@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./scoredp.db"
 
@@ -22,3 +22,6 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def checkpoint(db: Session):
+    db.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.database import checkpoint, get_db
 from app.models import Song, User, Score
 from app.schemas import SongCreate, SongUpdate
 from app.utils import normalize_title
@@ -14,12 +14,6 @@ import requests
 from bs4 import BeautifulSoup
 
 ZASA_URL = "https://zasa.sakura.ne.jp/dp/run.php"
-TITLE_FIXES: dict[str, str] = {
-    "Muzik LoverZ": "Musik LoverZ",
-    "Voo Boo Bamboleo": "Voo Doo Bamboleo",
-    "ƒƒƒƒƒ": "fffff",
-    "POLꓘAMAИIA": "POLꞰAMAИIA",
-}
 DIFFICULTY_MAP = {"5": "HYPER", "7": "ANOTHER", "9": "LEGGENDARIA"}
 CELL_RE = re.compile(r"☆(\d+)\s*\(([0-9.]+)\)")
 LINK_RE = re.compile(r"music\.php\?id=(\d{5})-([579])-[01]")
@@ -58,7 +52,6 @@ def _fetch_zasa_songs():
         title = cells[-1].get_text(strip=True)
         if not title:
             continue
-        title = TITLE_FIXES.get(title, title)
         for cell in cells[:3]:
             info = _parse_zasa_cell(cell)
             if info:
@@ -93,6 +86,7 @@ def update_song(song_id: int, song: SongUpdate, db: Session = Depends(get_db)):
     existing.chart = song.chart
     existing.unofficial_level = song.unofficial_level
     db.commit()
+    checkpoint(db)
     db.refresh(existing)
     return {
         "id": existing.id,
@@ -112,6 +106,7 @@ def delete_song(song_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="곡을 찾을 수 없습니다")
     db.delete(song)
     db.commit()
+    checkpoint(db)
     return {"message": "삭제 완료"}
 
 
@@ -190,6 +185,7 @@ def import_songs(file: UploadFile = File(...), db: Session = Depends(get_db)):
             added += 1
 
     db.commit()
+    checkpoint(db)
     return {"updated": updated, "added": added, "skipped": skipped}
 
 
@@ -228,6 +224,7 @@ def sync_zasa(db: Session = Depends(get_db)):
             added += 1
 
     db.commit()
+    checkpoint(db)
     return {"updated": updated, "added": added}
 
 
@@ -255,6 +252,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.query(Score).filter(Score.user_id == user_id).delete()
     db.delete(user)
     db.commit()
+    checkpoint(db)
     return {"message": "삭제 완료"}
 
 
@@ -294,4 +292,5 @@ def delete_score(score_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="스코어를 찾을 수 없습니다")
     db.delete(score)
     db.commit()
+    checkpoint(db)
     return {"message": "삭제 완료"}
