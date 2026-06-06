@@ -94,6 +94,7 @@ def get_scores(
 
     return [
         ScoreResponse(
+            song_id=song.id,
             title=song.title,
             level=song.level,
             chart=song.chart,

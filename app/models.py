@@ -8,7 +8,9 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     iidx_id = Column(String, unique=True, index=True, nullable=False)
     dj_name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
     scores = relationship("Score", back_populates="user")
+    options = relationship("Option", back_populates="user")
 
 class Song(Base):
     __tablename__ = "songs"
@@ -32,3 +34,13 @@ class Score(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user = relationship("User", back_populates="scores")
     song = relationship("Song", back_populates="scores")
+
+class Option(Base):
+    __tablename__ = "options"
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    song_id = Column(Integer, ForeignKey("songs.id"), primary_key=True)
+    flip = Column(Integer, nullable=False, default=0)       # 0/1
+    left_arr = Column(Integer, nullable=False, default=0)   # 0=정배 1=미러 2=랜덤 3=R-랜덤 4=슈퍼랜덤
+    right_arr = Column(Integer, nullable=False, default=0)
+    user = relationship("User", back_populates="options")
+    song = relationship("Song")

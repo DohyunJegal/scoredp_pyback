@@ -16,6 +16,7 @@ class UploadRequest(BaseModel):
     scores: List[ScoreItem]
 
 class ScoreResponse(BaseModel):
+    song_id: int
     title: str
     level: int
     chart: str

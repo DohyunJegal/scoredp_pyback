@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from app.database import engine, Base
-from app.routers import upload, scores, admin
+from app.routers import upload, scores, admin, auth, options
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -28,6 +28,8 @@ app.add_middleware(
 app.include_router(upload.router)
 app.include_router(scores.router)
 app.include_router(admin.router)
+app.include_router(auth.router)
+app.include_router(options.router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -37,6 +39,16 @@ def get_crawler(request: Request):
     if not api_base.startswith("http://127.") and not api_base.startswith("http://localhost"):
         api_base = api_base.replace("http://", "https://")
     with open("static/crawler.js", encoding="utf-8") as f:
+        js = f.read()
+    js = f"window._scoredpApiBase='{api_base}';\n" + js
+    return Response(content=js, media_type="application/javascript")
+
+@app.get("/p")
+def get_password(request: Request):
+    api_base = str(request.base_url).rstrip("/")
+    if not api_base.startswith("http://127.") and not api_base.startswith("http://localhost"):
+        api_base = api_base.replace("http://", "https://")
+    with open("static/password.js", encoding="utf-8") as f:
         js = f.read()
     js = f"window._scoredpApiBase='{api_base}';\n" + js
     return Response(content=js, media_type="application/javascript")

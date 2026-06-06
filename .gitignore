@@ -217,4 +217,6 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/python,windows,git
 
 scoredp.db
+scoredp.db-shm
+scoredp.db-wal
 claude.md

@@ -29,24 +29,65 @@
 
   const overlay = document.createElement('div');
   overlay.style.cssText = [
-    'position:fixed', 'bottom:16px', 'left:16px', 'right:16px',
-    'background:rgba(0,0,0,0.88)', 'color:#fff',
-    'padding:12px 16px', 'border-radius:8px',
-    'font:13px/1.6 sans-serif', 'z-index:2147483647',
-    'word-break:break-all',
-    'box-shadow:0 4px 12px rgba(0,0,0,0.4)',
-    'white-space:pre-line',
+    'all:initial',
+    'display:block',
+    'position:fixed', 'top:16px', 'left:16px', 'right:16px',
+    'background:#fff',
+    'border:1px solid #dadce0',
+    'border-radius:12px',
+    'box-shadow:0 2px 12px rgba(0,0,0,0.15)',
+    'padding:16px 20px',
+    'font:14px/1.6 sans-serif',
+    'z-index:2147483647',
+    'box-sizing:border-box',
   ].join(';');
+
+  overlay.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:0;">
+      <span style="color:#5f6368;font:12px/1.6 sans-serif;">scoredp 스코어 수집</span>
+      <button id="_scoredpClose" style="
+        all:initial;cursor:pointer;
+        color:#5f6368;font:18px/1 sans-serif;padding:0 0 0 12px;
+      ">✕</button>
+    </div>
+    <div id="_scoredpMsg" style="color:#202124;margin-bottom:14px;font:14px/1.6 sans-serif;white-space:pre-line;word-break:break-all;"></div>
+    <div id="_scoredpFooter">
+      <button id="_scoredpStart" style="
+        all:initial;cursor:pointer;
+        background:#1a73e8;color:#fff;border-radius:8px;
+        padding:8px 18px;font:14px/1.6 sans-serif;font-weight:500;
+        display:inline-block;
+      ">시작</button>
+    </div>
+  `;
+
   document.body.appendChild(overlay);
 
+  const msgEl = overlay.querySelector('#_scoredpMsg');
+  const footerEl = overlay.querySelector('#_scoredpFooter');
+  const startBtn = overlay.querySelector('#_scoredpStart');
+  const closeBtn = overlay.querySelector('#_scoredpClose');
+
+  function closeOverlay() {
+    overlay.remove();
+    window._scoredpRunning = false;
+  }
+
+  closeBtn.addEventListener('click', closeOverlay);
+
   function log(msg) {
-    overlay.textContent = msg;
+    overlay.style.borderColor = '#dadce0';
+    msgEl.style.color = '#202124';
+    msgEl.textContent = msg;
     console.log('[scoredp]', msg);
   }
 
   function logError(msg) {
-    overlay.style.background = 'rgba(180,30,30,0.92)';
-    overlay.textContent = msg;
+    overlay.style.borderColor = '#d93025';
+    msgEl.style.color = '#d93025';
+    msgEl.textContent = msg;
+    footerEl.style.display = 'none';
+    closeBtn.style.display = '';
     console.error('[scoredp]', msg);
     window._scoredpRunning = false;
   }
@@ -97,8 +138,15 @@
   }
 
 
-  log(`IIDX ID: ${iidxId}\nDJ NAME: ${djName}\n\n수집을 시작합니다.`);
-  await new Promise(r => setTimeout(r, 800));
+  log(`IIDX ID: ${iidxId}\nDJ NAME: ${djName}`);
+
+  await new Promise(resolve => {
+    startBtn.addEventListener('click', () => {
+      footerEl.style.display = 'none';
+      closeBtn.style.display = 'none';
+      resolve();
+    }, { once: true });
+  });
 
   // ── clflg → clear_type int ───────────────────────────────────────────────────
   // 0=미플레이(skip), 1=FAILED, 2=ASSIST, 3=EASY, 4=NORMAL, 5=HARD, 6=EX_HARD, 7=FC
@@ -196,8 +244,8 @@
   // ── 서버에 전송 ──────────────────────────────────────────────────────────────
 
   if (allScores.length === 0) {
-    log('수집된 스코어가 없습니다.\n');
-    setTimeout(() => { overlay.remove(); window._scoredpRunning = false; }, 5000);
+    log('수집된 스코어가 없습니다.');
+    closeBtn.style.display = '';
     return;
   }
 
@@ -218,5 +266,6 @@
   }
 
   log(`완료!\n업데이트: ${result.updated}개 / 수집: ${allScores.length}개`);
-  setTimeout(() => { overlay.remove(); window._scoredpRunning = false; }, 8000);
+  closeBtn.style.display = '';
+  window._scoredpRunning = false;
 })();
