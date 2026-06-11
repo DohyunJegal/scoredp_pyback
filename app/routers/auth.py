@@ -25,7 +25,10 @@ def verify_password(iidx_id: str, password: str, stored_hash: str) -> bool:
 def get_status(iidx_id: str, db: Session = Depends(get_db)):
     iidx_id = iidx_id.replace("-", "")
     user = db.query(User).filter(User.iidx_id == iidx_id).first()
-    return {"has_password": bool(user and user.password_hash)}
+    return {
+        "has_password": bool(user and user.password_hash),
+        "dj_name": user.dj_name if user else None,
+    }
 
 
 @router.post("/verify")
