@@ -66,7 +66,13 @@ def get_songs(level: Optional[int] = None, db: Session = Depends(get_db)):
         query = query.filter(Song.level == level)
     songs = query.order_by(Song.unofficial_level.desc(), Song.title).all()
     return [
-        {"title": s.title, "chart": s.chart, "level": s.level, "unofficial_level": s.unofficial_level}
+        {
+            "title": s.title,
+            "chart": s.chart,
+            "level": s.level,
+            "unofficial_level": s.unofficial_level,
+            "version_id": s.version_id,
+        }
         for s in songs
     ]
 
@@ -99,6 +105,7 @@ def get_scores(
             level=song.level,
             chart=song.chart,
             unofficial_level=song.unofficial_level,
+            version_id=song.version_id,
             clear_type=user_scores[song.id].clear_type if song.id in user_scores else 0,
             score=user_scores[song.id].score if song.id in user_scores else 0,
             dj_level=user_scores[song.id].dj_level if song.id in user_scores else "---",

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import checkpoint, get_db
-from app.models import Song, User, Score
+from app.models import Song, User, Score, Version
 from app.schemas import SongCreate, SongUpdate
 from app.utils import normalize_title
 from typing import List
@@ -45,7 +45,12 @@ def _fetch_zasa_songs():
     resp.encoding = resp.apparent_encoding
     soup = BeautifulSoup(resp.text, "html.parser")
     songs = []
+    version = None
     for row in soup.find_all("tr"):
+        header = row.find("th")
+        if header:
+            version = header.get_text(strip=True)
+            continue
         cells = row.find_all("td")
         if len(cells) < 4:
             continue
@@ -55,8 +60,19 @@ def _fetch_zasa_songs():
         for cell in cells[:3]:
             info = _parse_zasa_cell(cell)
             if info:
-                songs.append({**info, "title": title})
+                songs.append({**info, "title": title, "version": version})
     return songs
+
+
+def _get_or_create_version(db: Session, name: str, cache: dict):
+    if name not in cache:
+        v = db.query(Version).filter(Version.name == name).first()
+        if not v:
+            v = Version(name=name)
+            db.add(v)
+            db.flush()
+        cache[name] = v.id
+    return cache[name]
 
 
 # 관리자 인증
@@ -199,18 +215,21 @@ def sync_zasa(db: Session = Depends(get_db)):
 
     updated = 0
     added = 0
+    version_cache: dict = {}
 
     for s in songs:
         title_normalized = normalize_title(s["title"])
+        version_id = _get_or_create_version(db, s["version"], version_cache) if s["version"] else None
         existing = db.query(Song).filter(
             Song.title_normalized == title_normalized,
             Song.chart == s["chart"],
             Song.level == s["level"]
         ).first()
         if existing:
-            if existing.unofficial_level != s["unofficial_level"] or existing.zasa_id != s["zasa_id"]:
+            if existing.unofficial_level != s["unofficial_level"] or existing.zasa_id != s["zasa_id"] or existing.version_id != version_id:
                 existing.unofficial_level = s["unofficial_level"]
                 existing.zasa_id = s["zasa_id"]
+                existing.version_id = version_id
                 updated += 1
         else:
             db.add(Song(
@@ -220,6 +239,7 @@ def sync_zasa(db: Session = Depends(get_db)):
                 chart=s["chart"],
                 unofficial_level=s["unofficial_level"],
                 zasa_id=s["zasa_id"],
+                version_id=version_id,
             ))
             added += 1
 

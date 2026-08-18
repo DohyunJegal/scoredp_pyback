@@ -21,6 +21,7 @@ class ScoreResponse(BaseModel):
     level: int
     chart: str
     unofficial_level: Optional[float]
+    version_id: Optional[int]
     clear_type: int
     score: int
     dj_level: str

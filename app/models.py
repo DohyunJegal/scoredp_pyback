@@ -12,15 +12,22 @@ class User(Base):
     scores = relationship("Score", back_populates="user")
     options = relationship("Option", back_populates="user")
 
+class Version(Base):
+    __tablename__ = "versions"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+
 class Song(Base):
     __tablename__ = "songs"
     id = Column(Integer, primary_key=True)
-    zasa_id = Column(String, nullable=True)       # "01010" - 버전 포함
+    zasa_id = Column(String, nullable=True)       # "01010" - zasa 내부 곡 id (버전과 무관)
     title = Column(String, nullable=False)
     title_normalized = Column(String, nullable=False, index=True)  # 정규화된 곡명 (매칭용)
     level = Column(Integer, nullable=False)
     chart = Column(String, nullable=False)        # HYPER/ANOTHER/LEGGENDARIA
     unofficial_level = Column(Float, nullable=True)
+    version_id = Column(Integer, ForeignKey("versions.id"), nullable=True)
+    version = relationship("Version")
     scores = relationship("Score", back_populates="song")
 
 class Score(Base):

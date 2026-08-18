@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import SessionLocal, engine, Base
-from app.models import Song
+from app.models import Song, Version
 from app.utils import normalize_title
 
 ZASA_URL = "https://zasa.sakura.ne.jp/dp/run.php"
@@ -80,11 +80,17 @@ def fetch_songs():
     resp.encoding = resp.apparent_encoding
     soup = BeautifulSoup(resp.text, "html.parser")
 
-    # 테이블 행을 순회 (헤더 행 제외)
+    # 테이블 행 순회
     rows = soup.find_all("tr")
     songs = []
+    version = None
 
     for row in rows:
+        header = row.find("th")
+        if header:
+            version = header.get_text(strip=True)
+            continue
+
         cells = row.find_all("td")
         # 열 구성: HYPER | ANOTHER | LEGGENDARIA | 곡명
         if len(cells) < 4:
@@ -108,9 +114,21 @@ def fetch_songs():
                 "level": info["level"],
                 "chart": info["chart"],
                 "unofficial_level": info["unofficial_level"],
+                "version": version,
             })
 
     return songs
+
+
+def _get_or_create_version(db, name, cache):
+    if name not in cache:
+        v = db.query(Version).filter(Version.name == name).first()
+        if not v:
+            v = Version(name=name)
+            db.add(v)
+            db.flush()
+        cache[name] = v.id
+    return cache[name]
 
 
 def main():
@@ -124,8 +142,12 @@ def main():
 
         added = 0
         skipped = 0
+        version_cache = {}
 
         for s in songs:
+            version_name = s.pop("version")
+            version_id = _get_or_create_version(db, version_name, version_cache) if version_name else None
+
             existing = db.query(Song).filter(
                 Song.title_normalized == s["title_normalized"],
                 Song.chart == s["chart"]
@@ -135,9 +157,10 @@ def main():
                 existing.zasa_id = s["zasa_id"]
                 existing.unofficial_level = s["unofficial_level"]
                 existing.title_normalized = s["title_normalized"]
+                existing.version_id = version_id
                 skipped += 1
             else:
-                db.add(Song(**s))
+                db.add(Song(**s, version_id=version_id))
                 added += 1
 
         db.commit()

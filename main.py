@@ -6,6 +6,9 @@ load_dotenv()
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
+
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from app.database import engine, Base
 from app.routers import upload, scores, admin, auth, options
 
@@ -15,6 +18,12 @@ logging.basicConfig(
 )
 
 Base.metadata.create_all(bind=engine)
+
+try:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE songs ADD COLUMN version_id INTEGER"))
+except OperationalError:
+    pass
 
 app = FastAPI(title="scoredp API", docs_url=None, redoc_url=None, openapi_url=None)
 
