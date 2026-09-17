@@ -25,6 +25,16 @@ try:
 except OperationalError:
     pass
 
+for _stmt in (
+    "ALTER TABLE rival_posts ADD COLUMN sp_arena VARCHAR",
+    "ALTER TABLE rival_posts ADD COLUMN dp_arena VARCHAR",
+):
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(_stmt))
+    except OperationalError:
+        pass
+
 app = FastAPI(title="scoredp API", docs_url=None, redoc_url=None, openapi_url=None)
 
 app.add_middleware(

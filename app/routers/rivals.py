@@ -43,6 +43,8 @@ def list_posts(
     q: Optional[str] = None,
     sp_dan: Optional[int] = None,
     dp_dan: Optional[int] = None,
+    sp_arena: Optional[str] = None,
+    dp_arena: Optional[str] = None,
     page: int = Query(default=1, ge=1),
     db: Session = Depends(get_db),
 ):
@@ -56,6 +58,10 @@ def list_posts(
         query = query.filter(RivalPost.sp_dan == sp_dan)
     if dp_dan:
         query = query.filter(RivalPost.dp_dan == dp_dan)
+    if sp_arena:
+        query = query.filter(RivalPost.sp_arena == sp_arena)
+    if dp_arena:
+        query = query.filter(RivalPost.dp_arena == dp_arena)
     total = query.count()
     posts = (
         query.order_by(RivalPost.created_at.desc())
@@ -69,7 +75,8 @@ def list_posts(
         items=[
             RivalPostResponse(
                 id=p.id, iidx_id=p.iidx_id, dj_name=p.dj_name,
-                sp_dan=p.sp_dan, dp_dan=p.dp_dan, title=p.title, content=p.content,
+                sp_dan=p.sp_dan, dp_dan=p.dp_dan, sp_arena=p.sp_arena, dp_arena=p.dp_arena,
+                title=p.title, content=p.content,
                 created_at=p.created_at, updated_at=p.updated_at,
                 comment_count=len(p.comments),
             )
@@ -84,7 +91,8 @@ def get_post(post_id: int, db: Session = Depends(get_db)):
     post = _get_post_or_404(post_id, db)
     return RivalPostResponse(
         id=post.id, iidx_id=post.iidx_id, dj_name=post.dj_name,
-        sp_dan=post.sp_dan, dp_dan=post.dp_dan, title=post.title, content=post.content,
+        sp_dan=post.sp_dan, dp_dan=post.dp_dan, sp_arena=post.sp_arena, dp_arena=post.dp_arena,
+        title=post.title, content=post.content,
         created_at=post.created_at, updated_at=post.updated_at,
         comment_count=len(post.comments),
     )
@@ -98,6 +106,8 @@ def create_post(data: RivalPostCreate, db: Session = Depends(get_db)):
         password_hash=hash_password(data.password),
         sp_dan=data.sp_dan,
         dp_dan=data.dp_dan,
+        sp_arena=data.sp_arena,
+        dp_arena=data.dp_arena,
         title=data.title,
         content=data.content,
     )
@@ -106,7 +116,8 @@ def create_post(data: RivalPostCreate, db: Session = Depends(get_db)):
     db.refresh(post)
     return RivalPostResponse(
         id=post.id, iidx_id=post.iidx_id, dj_name=post.dj_name,
-        sp_dan=post.sp_dan, dp_dan=post.dp_dan, title=post.title, content=post.content,
+        sp_dan=post.sp_dan, dp_dan=post.dp_dan, sp_arena=post.sp_arena, dp_arena=post.dp_arena,
+        title=post.title, content=post.content,
         created_at=post.created_at, updated_at=post.updated_at, comment_count=0,
     )
 
@@ -126,13 +137,16 @@ def update_post(post_id: int, data: RivalPostUpdate, db: Session = Depends(get_d
         raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
     post.sp_dan = data.sp_dan
     post.dp_dan = data.dp_dan
+    post.sp_arena = data.sp_arena
+    post.dp_arena = data.dp_arena
     post.title = data.title
     post.content = data.content
     db.commit()
     db.refresh(post)
     return RivalPostResponse(
         id=post.id, iidx_id=post.iidx_id, dj_name=post.dj_name,
-        sp_dan=post.sp_dan, dp_dan=post.dp_dan, title=post.title, content=post.content,
+        sp_dan=post.sp_dan, dp_dan=post.dp_dan, sp_arena=post.sp_arena, dp_arena=post.dp_arena,
+        title=post.title, content=post.content,
         created_at=post.created_at, updated_at=post.updated_at,
         comment_count=len(post.comments),
     )

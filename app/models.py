@@ -60,6 +60,8 @@ class RivalPost(Base):
     password_hash = Column(String, nullable=False)
     sp_dan = Column(Integer, nullable=True, index=True)  # 1~10=초단~10단, 11=중전, 12=개전
     dp_dan = Column(Integer, nullable=True, index=True)
+    sp_arena = Column(String, nullable=True, index=True)  # "A1"(최상) ~ "C5"(최하)
+    dp_arena = Column(String, nullable=True, index=True)
     title = Column(String, nullable=False)
     content = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

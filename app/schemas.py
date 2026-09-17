@@ -26,6 +26,11 @@ def _check_iidx_id(value: str) -> str:
         raise ValueError("IIDX ID는 8자리 숫자여야 합니다.")
     return value
 
+def _check_arena(value: Optional[str]) -> Optional[str]:
+    if value is not None and not re.fullmatch(r"[ABC][1-5]", value):
+        raise ValueError("아레나 클래스는 A1~C5 중 하나여야 합니다.")
+    return value
+
 class ScoreItem(BaseModel):
     title: str
     chart: str
@@ -71,6 +76,8 @@ class RivalPostCreate(BaseModel):
     password: str = Field(min_length=1, max_length=72)
     sp_dan: Optional[int] = Field(default=None, ge=1, le=12)
     dp_dan: Optional[int] = Field(default=None, ge=1, le=12)
+    sp_arena: Optional[str] = Field(default=None, max_length=2)
+    dp_arena: Optional[str] = Field(default=None, max_length=2)
     title: str = Field(min_length=1, max_length=60)
     content: str = Field(min_length=1, max_length=1000)
 
@@ -84,6 +91,11 @@ class RivalPostCreate(BaseModel):
     def _check_dj_name(cls, v):
         return _no_html(_check_ascii(v))
 
+    @field_validator("sp_arena", "dp_arena")
+    @classmethod
+    def _check_arena_fields(cls, v):
+        return _check_arena(v)
+
     @field_validator("title", "content")
     @classmethod
     def _check_no_html(cls, v):
@@ -93,8 +105,15 @@ class RivalPostUpdate(BaseModel):
     password: str = Field(min_length=1, max_length=72)
     sp_dan: Optional[int] = Field(default=None, ge=1, le=12)
     dp_dan: Optional[int] = Field(default=None, ge=1, le=12)
+    sp_arena: Optional[str] = Field(default=None, max_length=2)
+    dp_arena: Optional[str] = Field(default=None, max_length=2)
     title: str = Field(min_length=1, max_length=60)
     content: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("sp_arena", "dp_arena")
+    @classmethod
+    def _check_arena_fields(cls, v):
+        return _check_arena(v)
 
     @field_validator("title", "content")
     @classmethod
@@ -140,6 +159,8 @@ class RivalPostResponse(BaseModel):
     dj_name: str
     sp_dan: Optional[int]
     dp_dan: Optional[int]
+    sp_arena: Optional[str]
+    dp_arena: Optional[str]
     title: str
     content: str
     created_at: datetime

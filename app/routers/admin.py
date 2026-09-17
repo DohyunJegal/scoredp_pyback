@@ -339,6 +339,8 @@ def get_rival_posts(page: int = Query(default=1, ge=1), db: Session = Depends(ge
                 "dj_name": p.dj_name,
                 "sp_dan": p.sp_dan,
                 "dp_dan": p.dp_dan,
+                "sp_arena": p.sp_arena,
+                "dp_arena": p.dp_arena,
                 "title": p.title,
                 "content": p.content,
                 "created_at": _as_utc(p.created_at),
