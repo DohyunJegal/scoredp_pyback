@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from app.database import engine, Base
-from app.routers import upload, scores, admin, auth, options
+from app.routers import upload, scores, admin, auth, options, rivals
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -39,6 +39,7 @@ app.include_router(scores.router)
 app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(options.router)
+app.include_router(rivals.router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

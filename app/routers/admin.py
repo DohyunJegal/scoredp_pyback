@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import checkpoint, get_db
-from app.models import Song, User, Score, Version
+from app.models import Song, User, Score, Version, RivalPost, RivalComment
 from app.schemas import SongCreate, SongUpdate
 from app.utils import normalize_title
 from typing import List
@@ -311,6 +311,74 @@ def delete_score(score_id: int, db: Session = Depends(get_db)):
     if not score:
         raise HTTPException(status_code=404, detail="스코어를 찾을 수 없습니다")
     db.delete(score)
+    db.commit()
+    checkpoint(db)
+    return {"message": "삭제 완료"}
+
+
+# 라이벌 게시글 목록
+@router.get("/admin/rivals")
+def get_rival_posts(db: Session = Depends(get_db)):
+    posts = db.query(RivalPost).order_by(RivalPost.created_at.desc()).all()
+    return [
+        {
+            "id": p.id,
+            "iidx_id": p.iidx_id,
+            "dj_name": p.dj_name,
+            "sp_dan": p.sp_dan,
+            "dp_dan": p.dp_dan,
+            "title": p.title,
+            "content": p.content,
+            "created_at": p.created_at,
+            "comment_count": len(p.comments),
+        }
+        for p in posts
+    ]
+
+
+# 라이벌 게시글 삭제
+@router.delete("/admin/rivals/{post_id}")
+def delete_rival_post(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(RivalPost).filter(RivalPost.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다")
+    db.delete(post)
+    db.commit()
+    checkpoint(db)
+    return {"message": "삭제 완료"}
+
+
+# 라이벌 게시글의 댓글 목록
+@router.get("/admin/rivals/{post_id}/comments")
+def get_rival_comments(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(RivalPost).filter(RivalPost.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다")
+    comments = (
+        db.query(RivalComment)
+        .filter(RivalComment.post_id == post_id)
+        .order_by(RivalComment.created_at)
+        .all()
+    )
+    return [
+        {
+            "id": c.id,
+            "iidx_id": c.iidx_id,
+            "dj_name": c.dj_name,
+            "content": c.content,
+            "created_at": c.created_at,
+        }
+        for c in comments
+    ]
+
+
+# 라이벌 댓글 삭제
+@router.delete("/admin/rivals/comments/{comment_id}")
+def delete_rival_comment(comment_id: int, db: Session = Depends(get_db)):
+    comment = db.query(RivalComment).filter(RivalComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다")
+    db.delete(comment)
     db.commit()
     checkpoint(db)
     return {"message": "삭제 완료"}

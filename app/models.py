@@ -51,3 +51,28 @@ class Option(Base):
     right_arr = Column(Integer, nullable=False, default=0)
     user = relationship("User", back_populates="options")
     song = relationship("Song")
+
+class RivalPost(Base):
+    __tablename__ = "rival_posts"
+    id = Column(Integer, primary_key=True, index=True)
+    iidx_id = Column(String, nullable=False, index=True)
+    dj_name = Column(String, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    sp_dan = Column(Integer, nullable=True, index=True)  # 1~10=초단~10단, 11=중전, 12=개전
+    dp_dan = Column(Integer, nullable=True, index=True)
+    title = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    comments = relationship("RivalComment", back_populates="post", cascade="all, delete-orphan")
+
+class RivalComment(Base):
+    __tablename__ = "rival_comments"
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("rival_posts.id"), nullable=False, index=True)
+    iidx_id = Column(String, nullable=False)
+    dj_name = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    post = relationship("RivalPost", back_populates="comments")
