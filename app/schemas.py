@@ -1,7 +1,12 @@
 import re
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _as_utc(v: datetime) -> datetime:
+    # SQLite는 tzinfo를 저장/복원하지 못해 항상 naive datetime을 돌려주므로,
+    # 응답 직렬화 전에 UTC로 명시해줘야 프론트에서 오파싱하지 않음
+    return v if v.tzinfo is not None else v.replace(tzinfo=timezone.utc)
 
 # 1 ~ 10 = 초단 ~ 10단, 11 = 중전, 12 = 개전
 DAN_LABELS = ["초단", "2단", "3단", "4단", "5단", "6단", "7단", "8단", "9단", "10단", "중전", "개전"]
@@ -141,6 +146,11 @@ class RivalPostResponse(BaseModel):
     updated_at: datetime
     comment_count: int = 0
 
+    @field_validator("created_at", "updated_at", mode="before")
+    @classmethod
+    def _tag_utc(cls, v):
+        return _as_utc(v) if isinstance(v, datetime) else v
+
     class Config:
         from_attributes = True
 
@@ -156,6 +166,11 @@ class RivalCommentResponse(BaseModel):
     dj_name: str
     content: str
     created_at: datetime
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _tag_utc(cls, v):
+        return _as_utc(v) if isinstance(v, datetime) else v
 
     class Config:
         from_attributes = True

@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import checkpoint, get_db
 from app.models import Song, User, Score, Version, RivalPost, RivalComment
-from app.schemas import SongCreate, SongUpdate
+from app.schemas import SongCreate, SongUpdate, _as_utc
 from app.utils import normalize_title
 from typing import List
 import openpyxl
@@ -341,7 +341,7 @@ def get_rival_posts(page: int = Query(default=1, ge=1), db: Session = Depends(ge
                 "dp_dan": p.dp_dan,
                 "title": p.title,
                 "content": p.content,
-                "created_at": p.created_at,
+                "created_at": _as_utc(p.created_at),
                 "comment_count": len(p.comments),
             }
             for p in posts
@@ -380,7 +380,7 @@ def get_rival_comments(post_id: int, db: Session = Depends(get_db)):
             "iidx_id": c.iidx_id,
             "dj_name": c.dj_name,
             "content": c.content,
-            "created_at": c.created_at,
+            "created_at": _as_utc(c.created_at),
         }
         for c in comments
     ]
