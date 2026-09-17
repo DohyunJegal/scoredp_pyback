@@ -144,6 +144,11 @@ class RivalPostResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class RivalPostPage(BaseModel):
+    items: List[RivalPostResponse]
+    has_more: bool
+    total: int
+
 class RivalCommentResponse(BaseModel):
     id: int
     post_id: int

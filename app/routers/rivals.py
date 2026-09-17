@@ -1,15 +1,17 @@
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
 from app.models import RivalPost, RivalComment
 from app.schemas import (
-    RivalPostCreate, RivalPostUpdate, RivalPostResponse,
+    RivalPostCreate, RivalPostUpdate, RivalPostResponse, RivalPostPage,
     RivalCommentCreate, RivalCommentUpdate, RivalCommentResponse,
     PasswordVerify,
 )
+
+PAGE_SIZE = 20
 
 router = APIRouter(prefix="/rivals")
 
@@ -36,11 +38,12 @@ def _get_comment_or_404(comment_id: int, db: Session) -> RivalComment:
     return comment
 
 
-@router.get("", response_model=List[RivalPostResponse])
+@router.get("", response_model=RivalPostPage)
 def list_posts(
     q: Optional[str] = None,
     sp_dan: Optional[int] = None,
     dp_dan: Optional[int] = None,
+    page: int = Query(default=1, ge=1),
     db: Session = Depends(get_db),
 ):
     query = db.query(RivalPost)
@@ -53,16 +56,27 @@ def list_posts(
         query = query.filter(RivalPost.sp_dan == sp_dan)
     if dp_dan:
         query = query.filter(RivalPost.dp_dan == dp_dan)
-    posts = query.order_by(RivalPost.created_at.desc()).all()
-    return [
-        RivalPostResponse(
-            id=p.id, iidx_id=p.iidx_id, dj_name=p.dj_name,
-            sp_dan=p.sp_dan, dp_dan=p.dp_dan, title=p.title, content=p.content,
-            created_at=p.created_at, updated_at=p.updated_at,
-            comment_count=len(p.comments),
-        )
-        for p in posts
-    ]
+    total = query.count()
+    posts = (
+        query.order_by(RivalPost.created_at.desc())
+        .offset((page - 1) * PAGE_SIZE)
+        .limit(PAGE_SIZE)
+        .all()
+    )
+    has_more = page * PAGE_SIZE < total
+    return RivalPostPage(
+        total=total,
+        items=[
+            RivalPostResponse(
+                id=p.id, iidx_id=p.iidx_id, dj_name=p.dj_name,
+                sp_dan=p.sp_dan, dp_dan=p.dp_dan, title=p.title, content=p.content,
+                created_at=p.created_at, updated_at=p.updated_at,
+                comment_count=len(p.comments),
+            )
+            for p in posts
+        ],
+        has_more=has_more,
+    )
 
 
 @router.get("/{post_id}", response_model=RivalPostResponse)

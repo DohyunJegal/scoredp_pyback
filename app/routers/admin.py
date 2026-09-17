@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import checkpoint, get_db
@@ -316,24 +316,38 @@ def delete_score(score_id: int, db: Session = Depends(get_db)):
     return {"message": "삭제 완료"}
 
 
+RIVALS_PAGE_SIZE = 20
+
 # 라이벌 게시글 목록
 @router.get("/admin/rivals")
-def get_rival_posts(db: Session = Depends(get_db)):
-    posts = db.query(RivalPost).order_by(RivalPost.created_at.desc()).all()
-    return [
-        {
-            "id": p.id,
-            "iidx_id": p.iidx_id,
-            "dj_name": p.dj_name,
-            "sp_dan": p.sp_dan,
-            "dp_dan": p.dp_dan,
-            "title": p.title,
-            "content": p.content,
-            "created_at": p.created_at,
-            "comment_count": len(p.comments),
-        }
-        for p in posts
-    ]
+def get_rival_posts(page: int = Query(default=1, ge=1), db: Session = Depends(get_db)):
+    total = db.query(RivalPost).count()
+    posts = (
+        db.query(RivalPost)
+        .order_by(RivalPost.created_at.desc())
+        .offset((page - 1) * RIVALS_PAGE_SIZE)
+        .limit(RIVALS_PAGE_SIZE)
+        .all()
+    )
+    has_more = page * RIVALS_PAGE_SIZE < total
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": p.id,
+                "iidx_id": p.iidx_id,
+                "dj_name": p.dj_name,
+                "sp_dan": p.sp_dan,
+                "dp_dan": p.dp_dan,
+                "title": p.title,
+                "content": p.content,
+                "created_at": p.created_at,
+                "comment_count": len(p.comments),
+            }
+            for p in posts
+        ],
+        "has_more": has_more,
+    }
 
 
 # 라이벌 게시글 삭제
