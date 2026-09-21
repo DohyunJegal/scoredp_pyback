@@ -25,9 +25,16 @@
     return;
   }
 
+  // 백엔드가 로컬이면 프론트도 로컬 주소로
+  const FRONTEND_BASE = /localhost|127\./.test(API_BASE) ? 'http://localhost:3000' : 'https://scoredp.vercel.app';
+
   // ── Overlay UI ──────────────────────────────────────────────────────────────
 
+  // 이전 오버레이 제거
+  document.getElementById('_scoredpOverlay')?.remove();
+
   const overlay = document.createElement('div');
+  overlay.id = '_scoredpOverlay';
   overlay.style.cssText = [
     'all:initial',
     'display:block',
@@ -45,10 +52,16 @@
   overlay.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:0;">
       <span style="color:#5f6368;font:12px/1.6 sans-serif;">scoredp 스코어 수집</span>
-      <button id="_scoredpClose" style="
-        all:initial;cursor:pointer;
-        color:#5f6368;font:18px/1 sans-serif;padding:0 0 0 12px;
-      ">✕</button>
+      <div>
+        <button id="_scoredpRetry" style="
+          all:initial;cursor:pointer;
+          color:#5f6368;font:18px/1 sans-serif;display:none;
+        ">⟳</button>
+        <button id="_scoredpClose" style="
+          all:initial;cursor:pointer;
+          color:#5f6368;font:18px/1 sans-serif;padding:0 0 0 12px;
+        ">✕</button>
+      </div>
     </div>
     <div id="_scoredpMsg" style="color:#202124;margin-bottom:14px;font:14px/1.6 sans-serif;white-space:pre-line;word-break:break-all;"></div>
     <div id="_scoredpFooter">
@@ -58,6 +71,12 @@
         padding:8px 18px;font:14px/1.6 sans-serif;font-weight:500;
         display:inline-block;
       ">시작</button>
+      <button id="_scoredpStartLegacy" style="
+        all:initial;cursor:pointer;
+        color:#5f6368;font:12px/1.6 sans-serif;text-decoration:underline;
+        padding:8px 0;margin-left:12px;
+        display:inline-block;
+      ">이전 데이터 사용</button>
     </div>
   `;
 
@@ -66,7 +85,12 @@
   const msgEl = overlay.querySelector('#_scoredpMsg');
   const footerEl = overlay.querySelector('#_scoredpFooter');
   const startBtn = overlay.querySelector('#_scoredpStart');
+  const startLegacyBtn = overlay.querySelector('#_scoredpStartLegacy');
   const closeBtn = overlay.querySelector('#_scoredpClose');
+  const retryBtn = overlay.querySelector('#_scoredpRetry');
+
+  // 사용자 정보 확인 전까지 시작 버튼 숨김
+  footerEl.style.display = 'none';
 
   function closeOverlay() {
     overlay.remove();
@@ -74,6 +98,10 @@
   }
 
   closeBtn.addEventListener('click', closeOverlay);
+  retryBtn.addEventListener('click', () => {
+    closeOverlay();
+    scoredpCrawler();
+  });
 
   function log(msg) {
     overlay.style.borderColor = '#dadce0';
@@ -88,13 +116,17 @@
     msgEl.textContent = msg;
     footerEl.style.display = 'none';
     closeBtn.style.display = '';
+    retryBtn.style.display = '';
     console.error('[scoredp]', msg);
     window._scoredpRunning = false;
   }
 
   // ── 사용자 정보 자동 수집 ─────────────────────────────────────────────────────
 
-  const IIDX_VERSION = 33;
+  let IIDX_VERSION = 34;
+  startLegacyBtn.textContent = `IIDX ${IIDX_VERSION - 1} 데이터 사용`;
+
+  log('데이터를 가져오는 중...');
 
   let iidxId, djName;
   try {
@@ -103,30 +135,19 @@
       { credentials: 'same-origin' }
     );
 
-    // 로그인하지 않으면 로그인 페이지로 리다이렉트됨
+    // 로그인하지 않은 경우
     if (!statusRes.url.includes('status.html')) {
       logError('로그인이 필요합니다.\ne-amusement에 로그인한 뒤 다시 시도해 주세요.');
       return;
     }
 
     const html = await statusRes.text();
-    const doc = new DOMParser().parseFromString(html, 'text/html');
 
-    // .dj-profile 테이블에서 DJ NAME / IIDX ID 파싱
-    const profileTable = doc.querySelector('.dj-status .dj-profile table');
-    if (!profileTable) {
-      logError('로그인이 필요합니다.\ne-amusement에 로그인한 뒤 다시 시도해 주세요.');
-      return;
-    }
-
-    for (const row of profileTable.querySelectorAll('tr')) {
-      const cells = row.querySelectorAll('td');
-      if (cells.length < 2) continue;
-      const key = cells[0].textContent.trim();
-      const val = cells[1].textContent.trim();
-      if (key === 'DJ NAME') djName = val;
-      if (key === 'IIDX ID') iidxId = val;
-    }
+    // 원본 HTML에서 정규식으로 데이터 직접 추출
+    const djNameMatch = html.match(/<td>\s*DJ NAME\s*<\/td>\s*<td>\s*([^<]+?)\s*<\/td>/);
+    const iidxIdMatch = html.match(/<td>\s*IIDX ID\s*<\/td>\s*<td>\s*([^<]+?)\s*<\/td>/);
+    djName = djNameMatch?.[1];
+    iidxId = iidxIdMatch?.[1];
 
     if (!iidxId || !djName) {
       logError('DJ NAME / IIDX ID를 읽을 수 없습니다.\n로그인 상태를 확인해 주세요.');
@@ -137,11 +158,17 @@
     return;
   }
 
-
   log(`IIDX ID: ${iidxId}\nDJ NAME: ${djName}`);
+  footerEl.style.display = '';
 
   await new Promise(resolve => {
     startBtn.addEventListener('click', () => {
+      footerEl.style.display = 'none';
+      closeBtn.style.display = 'none';
+      resolve();
+    }, { once: true });
+    startLegacyBtn.addEventListener('click', () => {
+      IIDX_VERSION = IIDX_VERSION - 1;
       footerEl.style.display = 'none';
       closeBtn.style.display = 'none';
       resolve();
@@ -266,6 +293,18 @@
   }
 
   log(`완료!\n업데이트: ${result.updated}개 / 수집: ${allScores.length}개`);
+  footerEl.innerHTML = `
+    <button id="_scoredpGo" style="
+      all:initial;cursor:pointer;
+      background:#1a73e8;color:#fff;border-radius:8px;
+      padding:8px 18px;font:14px/1.6 sans-serif;font-weight:500;
+      display:inline-block;
+    ">이동</button>
+  `;
+  footerEl.style.display = '';
+  overlay.querySelector('#_scoredpGo').addEventListener('click', () => {
+    window.open(`${FRONTEND_BASE}/scores?id=${iidxId.replace(/-/g, '')}`, '_blank');
+  });
   closeBtn.style.display = '';
   window._scoredpRunning = false;
 })();

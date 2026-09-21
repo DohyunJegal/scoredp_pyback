@@ -22,55 +22,14 @@
     return;
   }
 
-  // 사용자 정보 파싱
-  const IIDX_VERSION = 33;
-  let iidxId, djName;
+  // ── Overlay UI ──────────────────────────────────────────────────────────────
 
-  try {
-    const statusRes = await fetch(
-      `/game/2dx/${IIDX_VERSION}/djdata/status.html`,
-      { credentials: 'same-origin' }
-    );
+  // 이전 오버레이 제거
+  document.getElementById('_scoredpPwOverlay')?.remove();
 
-    if (!statusRes.url.includes('status.html')) {
-      alert('로그인이 필요합니다.\ne-amusement에 로그인한 뒤 다시 시도해 주세요.');
-      window._scoredpPwRunning = false;
-      return;
-    }
-
-    const html = await statusRes.text();
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const profileTable = doc.querySelector('.dj-status .dj-profile table');
-    if (!profileTable) {
-      alert('로그인이 필요합니다.\ne-amusement에 로그인한 뒤 다시 시도해 주세요.');
-      window._scoredpPwRunning = false;
-      return;
-    }
-
-    for (const row of profileTable.querySelectorAll('tr')) {
-      const cells = row.querySelectorAll('td');
-      if (cells.length < 2) continue;
-      const key = cells[0].textContent.trim();
-      const val = cells[1].textContent.trim();
-      if (key === 'DJ NAME') djName = val;
-      if (key === 'IIDX ID') iidxId = val;
-    }
-
-    if (!iidxId || !djName) {
-      alert('DJ NAME / IIDX ID를 읽을 수 없습니다.');
-      window._scoredpPwRunning = false;
-      return;
-    }
-  } catch (e) {
-    alert(`오류: ${e.message}`);
-    window._scoredpPwRunning = false;
-    return;
-  }
-
-  // ── 상단 오버레이 UI ─────────────────────────────────────────────────────────
-
-  const card = document.createElement('div');
-  card.style.cssText = [
+  const overlay = document.createElement('div');
+  overlay.id = '_scoredpPwOverlay';
+  overlay.style.cssText = [
     'all:initial',
     'display:block',
     'position:fixed', 'top:16px', 'left:16px', 'right:16px',
@@ -84,17 +43,85 @@
     'box-sizing:border-box',
   ].join(';');
 
-  card.innerHTML = `
+  overlay.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:0;">
       <span style="color:#5f6368;font:12px/1.6 sans-serif;">scoredp 개인 배치 저장</span>
-      <button id="_scoredpPwCancel" style="
-        all:initial;cursor:pointer;
-        color:#5f6368;font:18px/1 sans-serif;padding:0 0 0 12px;
-      ">✕</button>
+      <div>
+        <button id="_scoredpPwRetry" style="
+          all:initial;cursor:pointer;
+          color:#5f6368;font:18px/1 sans-serif;display:none;
+        ">⟳</button>
+        <button id="_scoredpPwClose" style="
+          all:initial;cursor:pointer;
+          color:#5f6368;font:18px/1 sans-serif;padding:0 0 0 12px;
+        ">✕</button>
+      </div>
     </div>
-    <div style="color:#202124;font-size:14px;margin-bottom:14px;">
-      <b>${djName}</b> 비밀번호 설정
-    </div>
+    <div id="_scoredpPwBody" style="color:#202124;font-size:14px;"></div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const bodyEl = overlay.querySelector('#_scoredpPwBody');
+  const closeBtn = overlay.querySelector('#_scoredpPwClose');
+  const retryBtn = overlay.querySelector('#_scoredpPwRetry');
+
+  function closeOverlay() {
+    overlay.remove();
+    window._scoredpPwRunning = false;
+  }
+
+  closeBtn.addEventListener('click', closeOverlay);
+  retryBtn.addEventListener('click', () => {
+    closeOverlay();
+    scoredpPassword();
+  });
+
+  function showError(msg) {
+    bodyEl.innerHTML = `<div style="color:#d93025;white-space:pre-line;">${msg}</div>`;
+    retryBtn.style.display = '';
+    window._scoredpPwRunning = false;
+  }
+
+  bodyEl.textContent = '데이터를 가져오는 중...';
+
+  // ── 사용자 정보 자동 수집 ─────────────────────────────────────────────────────
+
+  const IIDX_VERSION = 34;
+  let iidxId, djName;
+
+  try {
+    const statusRes = await fetch(
+      `/game/2dx/${IIDX_VERSION}/djdata/status.html`,
+      { credentials: 'same-origin' }
+    );
+
+    if (!statusRes.url.includes('status.html')) {
+      showError('로그인이 필요합니다.\ne-amusement에 로그인한 뒤 다시 시도해 주세요.');
+      return;
+    }
+
+    const html = await statusRes.text();
+
+    // 원본 HTML에서 정규식으로 데이터 직접 추출
+    const djNameMatch = html.match(/<td>\s*DJ NAME\s*<\/td>\s*<td>\s*([^<]+?)\s*<\/td>/);
+    const iidxIdMatch = html.match(/<td>\s*IIDX ID\s*<\/td>\s*<td>\s*([^<]+?)\s*<\/td>/);
+    djName = djNameMatch?.[1];
+    iidxId = iidxIdMatch?.[1];
+
+    if (!iidxId || !djName) {
+      showError('DJ NAME / IIDX ID를 읽을 수 없습니다.\n로그인 상태를 확인해 주세요.');
+      return;
+    }
+  } catch (e) {
+    showError(`오류: ${e.message}`);
+    return;
+  }
+
+  // ── 비밀번호 입력 폼 ─────────────────────────────────────────────────────────
+
+  bodyEl.innerHTML = `
+    <div style="margin-bottom:14px;"><b>${djName}</b> 비밀번호 설정</div>
     <div style="display:flex;align-items:center;gap:8px;">
       <input
         id="_scoredpPwInput"
@@ -117,12 +144,9 @@
     <div id="_scoredpPwMsg" style="margin-top:8px;font-size:12px;color:#d93025;min-height:16px;"></div>
   `;
 
-  document.body.appendChild(card);
-
-  const input = card.querySelector('#_scoredpPwInput');
-  const confirmBtn = card.querySelector('#_scoredpPwConfirm');
-  const cancelBtn = card.querySelector('#_scoredpPwCancel');
-  const msg = card.querySelector('#_scoredpPwMsg');
+  const input = overlay.querySelector('#_scoredpPwInput');
+  const confirmBtn = overlay.querySelector('#_scoredpPwConfirm');
+  const msg = overlay.querySelector('#_scoredpPwMsg');
 
   input.focus();
   input.addEventListener('focus', () => input.style.borderColor = '#1a73e8');
@@ -133,13 +157,6 @@
     confirmBtn.style.opacity = ready ? '1' : '0.4';
     confirmBtn.style.cursor = ready ? 'pointer' : 'default';
   });
-
-  function close() {
-    card.remove();
-    window._scoredpPwRunning = false;
-  }
-
-  cancelBtn.addEventListener('click', close);
 
   async function submit() {
     const pw = input.value.trim();
