@@ -1,8 +1,76 @@
 (async function scoredpCrawler() {
   'use strict';
 
+  // ── 다국어 문자열 ────────────────────
+  const LOCALE_KEY = 'scoredp_locale';
+  const LOCALE = (() => {
+    const saved = localStorage.getItem(LOCALE_KEY);
+    if (saved === 'ko' || saved === 'ja' || saved === 'en') return saved;
+    const lang = (navigator.language || 'ko').toLowerCase();
+    if (lang.startsWith('ja')) return 'ja';
+    if (lang.startsWith('en')) return 'en';
+    return 'ko';
+  })();
+
+  const STR = {
+    ko: {
+      alreadyRunning: '이미 실행 중입니다.',
+      noApiUrl: 'API URL을 확인할 수 없습니다.',
+      header: 'scoredp 스코어 수집',
+      start: '시작',
+      legacyLabel: (v) => `IIDX ${v} 데이터 사용`,
+      fetchingInfo: '데이터를 가져오는 중...',
+      loginRequired: '로그인이 필요합니다.\ne-amusement에 로그인한 뒤 다시 시도해 주세요.',
+      cannotReadInfo: 'DJ NAME / IIDX ID를 읽을 수 없습니다.\n로그인 상태를 확인해 주세요.',
+      infoError: (msg) => `사용자 정보 수집 오류: ${msg}`,
+      infoResult: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
+      collecting: (d, p, n) => `수집 중... (레벨 ${d}/12, ${p}페이지)\n수집된 곡: ${n}개`,
+      noScores: '수집된 스코어가 없습니다.',
+      uploading: (n) => `총 ${n}개 수집 완료.\n서버에 전송 중...`,
+      uploadError: (msg) => `전송 오류: ${msg}`,
+      done: (updated, total) => `완료!\n업데이트: ${updated}개 / 수집: ${total}개`,
+      goToPage: '이동',
+    },
+    ja: {
+      alreadyRunning: 'すでに実行中です。',
+      noApiUrl: 'API URLを確認できません。',
+      header: 'scoredp スコア収集',
+      start: '開始',
+      legacyLabel: (v) => `IIDX ${v} のデータを使用`,
+      fetchingInfo: 'データを取得中...',
+      loginRequired: 'ログインが必要です。\ne-amusementにログインしてから再度お試しください。',
+      cannotReadInfo: 'DJ NAME / IIDX IDを読み取れません。\nログイン状態をご確認ください。',
+      infoError: (msg) => `ユーザー情報取得エラー: ${msg}`,
+      infoResult: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
+      collecting: (d, p, n) => `収集中... (レベル ${d}/12, ${p}ページ目)\n収集した曲数: ${n}曲`,
+      noScores: '収集されたスコアがありません。',
+      uploading: (n) => `合計${n}曲収集完了。\nサーバーに送信中...`,
+      uploadError: (msg) => `送信エラー: ${msg}`,
+      done: (updated, total) => `完了！\n更新: ${updated}件 / 収集: ${total}件`,
+      goToPage: 'ページへ',
+    },
+    en: {
+      alreadyRunning: 'Already running.',
+      noApiUrl: 'Could not determine the API URL.',
+      header: 'scoredp score collector',
+      start: 'Start',
+      legacyLabel: (v) => `Use IIDX ${v} data`,
+      fetchingInfo: 'Fetching data...',
+      loginRequired: 'Login required.\nPlease log in to e-amusement and try again.',
+      cannotReadInfo: 'Could not read DJ NAME / IIDX ID.\nPlease check your login status.',
+      infoError: (msg) => `Error fetching user info: ${msg}`,
+      infoResult: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
+      collecting: (d, p, n) => `Collecting... (level ${d}/12, page ${p})\nSongs collected: ${n}`,
+      noScores: 'No scores were collected.',
+      uploading: (n) => `Collected ${n} songs.\nUploading to server...`,
+      uploadError: (msg) => `Upload error: ${msg}`,
+      done: (updated, total) => `Done!\nUpdated: ${updated} / Collected: ${total}`,
+      goToPage: 'View',
+    },
+  }[LOCALE];
+
   if (window._scoredpRunning) {
-    alert('이미 실행 중입니다.');
+    alert(STR.alreadyRunning);
     return;
   }
   window._scoredpRunning = true;
@@ -21,7 +89,7 @@
   ).replace(/\/$/, '');
 
   if (!API_BASE) {
-    alert('API URL을 확인할 수 없습니다.');
+    alert(STR.noApiUrl);
     return;
   }
 
@@ -51,11 +119,18 @@
 
   overlay.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:0;">
-      <span style="color:#5f6368;font:12px/1.6 sans-serif;">scoredp 스코어 수집</span>
+      <span style="color:#5f6368;font:12px/1.6 sans-serif;">${STR.header}</span>
       <div>
+        ${['ko', 'ja', 'en'].map(l => `
+          <button class="_scoredpLang" data-locale="${l}" style="
+            all:initial;cursor:pointer;
+            color:${l === LOCALE ? '#1a73e8' : '#5f6368'};font:12px/1.6 sans-serif;
+            font-weight:${l === LOCALE ? '600' : '400'};padding:0 4px;
+          ">${l.toUpperCase()}</button>
+        `).join('')}
         <button id="_scoredpRetry" style="
           all:initial;cursor:pointer;
-          color:#5f6368;font:18px/1 sans-serif;display:none;
+          color:#5f6368;font:18px/1 sans-serif;display:none;padding:0 0 0 8px;
         ">⟳</button>
         <button id="_scoredpClose" style="
           all:initial;cursor:pointer;
@@ -70,13 +145,13 @@
         background:#1a73e8;color:#fff;border-radius:8px;
         padding:8px 18px;font:14px/1.6 sans-serif;font-weight:500;
         display:inline-block;
-      ">시작</button>
+      ">${STR.start}</button>
       <button id="_scoredpStartLegacy" style="
         all:initial;cursor:pointer;
         color:#5f6368;font:12px/1.6 sans-serif;text-decoration:underline;
         padding:8px 0;margin-left:12px;
         display:inline-block;
-      ">이전 데이터 사용</button>
+      "></button>
     </div>
   `;
 
@@ -102,6 +177,13 @@
     closeOverlay();
     scoredpCrawler();
   });
+  overlay.querySelectorAll('._scoredpLang').forEach(btn => {
+    btn.addEventListener('click', () => {
+      localStorage.setItem(LOCALE_KEY, btn.dataset.locale);
+      closeOverlay();
+      scoredpCrawler();
+    });
+  });
 
   function log(msg) {
     overlay.style.borderColor = '#dadce0';
@@ -124,9 +206,9 @@
   // ── 사용자 정보 자동 수집 ─────────────────────────────────────────────────────
 
   let IIDX_VERSION = 34;
-  startLegacyBtn.textContent = `IIDX ${IIDX_VERSION - 1} 데이터 사용`;
+  startLegacyBtn.textContent = STR.legacyLabel(IIDX_VERSION - 1);
 
-  log('데이터를 가져오는 중...');
+  log(STR.fetchingInfo);
 
   let iidxId, djName;
   try {
@@ -137,7 +219,7 @@
 
     // 로그인하지 않은 경우
     if (!statusRes.url.includes('status.html')) {
-      logError('로그인이 필요합니다.\ne-amusement에 로그인한 뒤 다시 시도해 주세요.');
+      logError(STR.loginRequired);
       return;
     }
 
@@ -150,15 +232,15 @@
     iidxId = iidxIdMatch?.[1];
 
     if (!iidxId || !djName) {
-      logError('DJ NAME / IIDX ID를 읽을 수 없습니다.\n로그인 상태를 확인해 주세요.');
+      logError(STR.cannotReadInfo);
       return;
     }
   } catch (e) {
-    logError(`사용자 정보 수집 오류: ${e.message}`);
+    logError(STR.infoError(e.message));
     return;
   }
 
-  log(`IIDX ID: ${iidxId}\nDJ NAME: ${djName}`);
+  log(STR.infoResult(iidxId, djName));
   footerEl.style.display = '';
 
   await new Promise(resolve => {
@@ -245,7 +327,7 @@
   for (let difficult = 0; difficult <= 12; difficult++) {
     let offset = 0;
     while (true) {
-      log(`수집 중... (레벨 ${difficult}/12, ${offset/50+1}페이지)\n수집된 곡: ${allScores.length}개`);
+      log(STR.collecting(difficult, offset / 50 + 1, allScores.length));
 
       let doc;
       try {
@@ -271,12 +353,12 @@
   // ── 서버에 전송 ──────────────────────────────────────────────────────────────
 
   if (allScores.length === 0) {
-    log('수집된 스코어가 없습니다.');
+    log(STR.noScores);
     closeBtn.style.display = '';
     return;
   }
 
-  log(`총 ${allScores.length}개 수집 완료.\n서버에 전송 중...`);
+  log(STR.uploading(allScores.length));
 
   let result;
   try {
@@ -288,18 +370,18 @@
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     result = await res.json();
   } catch (e) {
-    logError(`전송 오류: ${e.message}`);
+    logError(STR.uploadError(e.message));
     return;
   }
 
-  log(`완료!\n업데이트: ${result.updated}개 / 수집: ${allScores.length}개`);
+  log(STR.done(result.updated, allScores.length));
   footerEl.innerHTML = `
     <button id="_scoredpGo" style="
       all:initial;cursor:pointer;
       background:#1a73e8;color:#fff;border-radius:8px;
       padding:8px 18px;font:14px/1.6 sans-serif;font-weight:500;
       display:inline-block;
-    ">이동</button>
+    ">${STR.goToPage}</button>
   `;
   footerEl.style.display = '';
   overlay.querySelector('#_scoredpGo').addEventListener('click', () => {
