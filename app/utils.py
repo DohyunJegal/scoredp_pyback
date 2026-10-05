@@ -10,7 +10,11 @@ _ALIASES: dict[str, str] = {
     '火影': '焱影',
     "POLꓘAMAИIA": "POLꞰAMAИIA",
     "Τeλοs": "Τέλος",
-    "ZEИITH": "zenith2"
+    # 'Zenith'와 'ZEИITH' 충돌 방지
+    "ZEИITH": "zenith2",
+    # 'with you…'와 'With You' 충돌 방지
+    "with you...": "withyoudd",
+    "with you…": "withyoudd",
 }
 
 # NFKD로 분해되지 않는 유사자 치환 테이블
