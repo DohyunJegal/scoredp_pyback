@@ -212,24 +212,28 @@
 
   let iidxId, djName;
   try {
-  const statusRes = await fetch(
-      `/game/2dx/${IIDX_VERSION}/djdata/status.html`,
-      { credentials: 'same-origin' }
-    );
+    // 최대 2회 재시도
+    let statusRes;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await new Promise(r => setTimeout(r, 1500));
+      statusRes = await fetch(
+        `/game/2dx/${IIDX_VERSION}/djdata/status.html`,
+        { credentials: 'same-origin', cache: 'no-store' }
+      );
+      if (!statusRes.url.includes('status.html')) break;
+
+      // 원본 HTML에서 정규식으로 데이터 직접 추출
+      const html = await statusRes.text();
+      djName = html.match(/<td>\s*DJ NAME\s*<\/td>\s*<td>\s*([^<]+?)\s*<\/td>/)?.[1];
+      iidxId = html.match(/<td>\s*IIDX ID\s*<\/td>\s*<td>\s*([^<]+?)\s*<\/td>/)?.[1];
+      if (iidxId && djName) break;
+    }
 
     // 로그인하지 않은 경우
     if (!statusRes.url.includes('status.html')) {
       logError(STR.loginRequired);
       return;
     }
-
-    const html = await statusRes.text();
-
-    // 원본 HTML에서 정규식으로 데이터 직접 추출
-    const djNameMatch = html.match(/<td>\s*DJ NAME\s*<\/td>\s*<td>\s*([^<]+?)\s*<\/td>/);
-    const iidxIdMatch = html.match(/<td>\s*IIDX ID\s*<\/td>\s*<td>\s*([^<]+?)\s*<\/td>/);
-    djName = djNameMatch?.[1];
-    iidxId = iidxIdMatch?.[1];
 
     if (!iidxId || !djName) {
       logError(STR.cannotReadInfo);
@@ -269,7 +273,7 @@
     const url =
       `/game/2dx/${IIDX_VERSION}/djdata/music/difficulty.html` +
       `?difficult=${difficult}&style=1&disp=1&offset=${offset}`;
-    const res = await fetch(url, { credentials: 'same-origin' });
+    const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const html = await res.text();
     return new DOMParser().parseFromString(html, 'text/html');
