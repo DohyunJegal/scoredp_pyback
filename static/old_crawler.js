@@ -2,7 +2,6 @@
   'use strict';
 
   // ── 다국어 문자열 ────────────────────
-
   const LOCALE_KEY = 'scoredp_locale';
   const LOCALE = (() => {
     const saved = localStorage.getItem(LOCALE_KEY);
@@ -25,10 +24,7 @@
       cannotReadInfo: 'DJ NAME / IIDX ID를 읽을 수 없습니다.\n로그인 상태를 확인해 주세요.',
       infoError: (msg) => `사용자 정보 수집 오류: ${msg}`,
       infoResult: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
-      collecting: (i, t, n) => `수집 중... (버전 ${i}/${t})\n수집된 곡: ${n}개`,
-      seriesFailed: (i) => `⚠ ${i}번째 버전 수집 실패, 재시도 리스트에 추가되었습니다.`,
-      retrying: (i, n) => `실패한 버전 재시도 중... (버전 ${i})\n수집된 곡: ${n}개`,
-      retryFailed: (i) => `⚠ ${i}번째 버전 수집 실패`,
+      collecting: (d, p, n) => `수집 중... (레벨 ${d}/12, ${p}페이지)\n수집된 곡: ${n}개`,
       noScores: '수집된 스코어가 없습니다.',
       uploading: (n) => `총 ${n}개 수집 완료.\n서버에 전송 중...`,
       uploadError: (msg) => `전송 오류: ${msg}`,
@@ -46,10 +42,7 @@
       cannotReadInfo: 'DJ NAME / IIDX IDを読み取れません。\nログイン状態をご確認ください。',
       infoError: (msg) => `ユーザー情報取得エラー: ${msg}`,
       infoResult: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
-      collecting: (i, t, n) => `収集中... (バージョン ${i}/${t})\n収集した曲数: ${n}曲`,
-      seriesFailed: (i) => `⚠ ${i}番目のバージョンの収集に失敗しました。再試行リストに追加しました。`,
-      retrying: (i, n) => `失敗したバージョンを再試行中... (バージョン ${i})\n収集した曲数: ${n}曲`,
-      retryFailed: (i) => `⚠ ${i}番目のバージョンの収集に失敗`,
+      collecting: (d, p, n) => `収集中... (レベル ${d}/12, ${p}ページ目)\n収集した曲数: ${n}曲`,
       noScores: '収集されたスコアがありません。',
       uploading: (n) => `合計${n}曲収集完了。\nサーバーに送信中...`,
       uploadError: (msg) => `送信エラー: ${msg}`,
@@ -67,10 +60,7 @@
       cannotReadInfo: 'Could not read DJ NAME / IIDX ID.\nPlease check your login status.',
       infoError: (msg) => `Error fetching user info: ${msg}`,
       infoResult: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
-      collecting: (i, t, n) => `Collecting... (version ${i}/${t})\nSongs collected: ${n}`,
-      seriesFailed: (i) => `⚠ Version ${i} failed. Added to the retry list.`,
-      retrying: (i, n) => `Retrying failed version... (version ${i})\nSongs collected: ${n}`,
-      retryFailed: (i) => `⚠ Version ${i} failed`,
+      collecting: (d, p, n) => `Collecting... (level ${d}/12, page ${p})\nSongs collected: ${n}`,
       noScores: 'No scores were collected.',
       uploading: (n) => `Collected ${n} songs.\nUploading to server...`,
       uploadError: (msg) => `Upload error: ${msg}`,
@@ -275,16 +265,14 @@
   // 0=미플레이(skip), 1=FAILED, 2=ASSIST, 3=EASY, 4=NORMAL, 5=HARD, 6=EX_HARD, 7=FC
   const CLFLG_TO_CLEAR_TYPE = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7 };
 
-  const DELAY_MS = 800;
-  const CHARTS = new Set(['HYPER', 'ANOTHER', 'LEGGENDARIA']);
-  const SERIES_COUNT = IIDX_VERSION;
+  const DELAY_MS = 750;
 
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
-  async function fetchDoc(series) {
+  async function fetchDoc(difficult, offset) {
     const url =
-      `/game/2dx/${IIDX_VERSION}/djdata/music/series.html` +
-      `?list=${series}&play_style=1&s=1&rival=`;
+      `/game/2dx/${IIDX_VERSION}/djdata/music/difficulty.html` +
+      `?difficult=${difficult}&style=1&disp=1&offset=${offset}`;
     const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const html = await res.text();
@@ -293,10 +281,16 @@
 
   // ── 페이지 파싱 ──────────────────────────────────────────────────────────────
 
-  function parsePage(doc, series) {
+  function parsePage(doc) {
     const results = [];
 
-    const rows = doc.querySelectorAll('.series-difficulty tr');
+    // 레벨을 헤더에서 파싱: "DP LEVEL 10" → 10
+    const th = doc.querySelector('.series-difficulty table th');
+    const levelMatch = th?.textContent.match(/LEVEL\s+(\d+)/i);
+    if (!levelMatch) return results;
+    const level = parseInt(levelMatch[1]);
+
+    const rows = doc.querySelectorAll('.series-difficulty table tbody tr');
     for (const row of rows) {
       const tds = row.querySelectorAll('td');
       if (tds.length < 5) continue;
@@ -306,7 +300,7 @@
 
       const title = anchor.textContent.trim();
       const chart = tds[1].textContent.trim();
-      if (!CHARTS.has(chart)) continue;
+      if (chart === 'NORMAL') continue;
 
       // DJ 레벨: 이미지 파일명 (예: "AA", "AAA", "F")
       const djLvImg = tds[2].querySelector('img');
@@ -324,7 +318,7 @@
       const clearType = CLFLG_TO_CLEAR_TYPE[clflgNum];
       if (!clearType) continue; // 미플레이 또는 알 수 없는 플래그
 
-      results.push({ title, chart, series, clear_type: clearType, score, dj_level: djLevel });
+      results.push({ title, chart, level, clear_type: clearType, score, dj_level: djLevel });
     }
 
     return results;
@@ -334,39 +328,34 @@
 
   const allScores = [];
 
-  // 버전별 수집, 실패하면 false 반환
-  async function collectSeries(series) {
-    try {
-      const doc = await fetchDoc(series);
-      if (!doc.querySelector('.series-difficulty')) return false;
-      allScores.push(...parsePage(doc, series));
-      return true;
-    } catch (e) {
-      console.warn(`[scoredp] series=${series}: ${e.message}`);
-      return false;
+  // 고레벨부터 역순으로 LEVEL 8까지
+  for (let difficult = 11; difficult >= 7; difficult--) {
+    let offset = 0;
+    while (true) {
+      log(STR.collecting(difficult + 1, offset / 50 + 1, allScores.length));
+
+      let doc;
+      try {
+        doc = await fetchDoc(difficult, offset);
+      } catch (e) {
+        console.warn(`[scoredp] skip difficult=${difficult} offset=${offset}: ${e.message}`);
+        break;
+      }
+
+      const songs = parsePage(doc);
+      allScores.push(...songs);
+
+      const hasNext = !!doc.querySelector('.navi-next a');
+      if (!hasNext) break;
+
+      offset += 50;
+      await new Promise(r => setTimeout(r, DELAY_MS));
     }
-  }
 
-  const failed = [];
-  log(STR.collecting(0, SERIES_COUNT, 0));
-  for (let series = 0; series < SERIES_COUNT; series++) {
-    const i = series + 1;
-    const ok = await collectSeries(series);
-    if (!ok) failed.push(series);
-    log(STR.collecting(i, SERIES_COUNT, allScores.length) + (ok ? '' : '\n' + STR.seriesFailed(i)));
     await new Promise(r => setTimeout(r, DELAY_MS));
   }
 
-  // 실패한 버전은 마지막에 한 번 재시도
-  for (const series of failed) {
-    const i = series + 1;
-    log(STR.retrying(i, allScores.length));
-    const ok = await collectSeries(series);
-    log(STR.collecting(i, SERIES_COUNT, allScores.length) + (ok ? '' : '\n' + STR.retryFailed(i)));
-    await new Promise(r => setTimeout(r, DELAY_MS));
-  }
-
-  // ── 서버 전송 ──────────────────────────────────────────────────────────────
+  // ── 서버에 전송 ──────────────────────────────────────────────────────────────
 
   if (allScores.length === 0) {
     log(STR.noScores);

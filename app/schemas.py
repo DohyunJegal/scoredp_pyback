@@ -34,7 +34,8 @@ def _check_arena(value: Optional[str]) -> Optional[str]:
 class ScoreItem(BaseModel):
     title: str
     chart: str
-    level: int
+    level: Optional[int] = None    # 레벨별 수집의 경우
+    series: Optional[int] = None   # series.html의 list 값 (0~33), 동명곡 구분용
     clear_type: int
     score: int
     dj_level: str

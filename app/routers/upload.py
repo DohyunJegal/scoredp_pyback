@@ -34,11 +34,29 @@ def upload_scores(data: UploadRequest, db: Session = Depends(get_db)):
         if item.chart == 'NORMAL':
             continue
         normalized = normalize_title(item.title)
-        song = db.query(Song).filter(
+        q = db.query(Song).filter(
             Song.title_normalized == normalized,
-            Song.chart == item.chart,
-            Song.level == item.level
-        ).first()
+            Song.chart == item.chart
+        )
+        if item.level is not None:
+            q = q.filter(Song.level == item.level)
+        cands = q.all()
+        if len(cands) > 1 and item.series is not None:
+            # 동명곡 series → version_id 비교
+            vids = (1, 2) if item.series == 0 else (item.series + 2,)
+            cands = [s for s in cands if s.version_id in vids] or cands
+        if len(cands) > 1:
+            logger.warning(
+                "Song match ambiguous | title=%r | normalized=%r | chart=%s | series=%s | song_ids=%s | version_ids=%s",
+                item.title,
+                normalized,
+                item.chart,
+                item.series,
+                [s.id for s in cands],
+                [s.version_id for s in cands]
+            )
+            continue
+        song = cands[0] if cands else None
         if not song:
             logger.warning(
                 "Song match failed | title=%r | normalized=%r | chart=%s",
