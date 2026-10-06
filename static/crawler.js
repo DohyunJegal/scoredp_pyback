@@ -265,7 +265,7 @@
   // 0=미플레이(skip), 1=FAILED, 2=ASSIST, 3=EASY, 4=NORMAL, 5=HARD, 6=EX_HARD, 7=FC
   const CLFLG_TO_CLEAR_TYPE = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7 };
 
-  const DELAY_MS = 400;
+  const DELAY_MS = 750;
 
   // ── Fetch helpers ────────────────────────────────────────────────────────────
 
@@ -328,10 +328,11 @@
 
   const allScores = [];
 
-  for (let difficult = 0; difficult <= 12; difficult++) {
+  // 고레벨부터 역순으로 LEVEL 8까지
+  for (let difficult = 11; difficult >= 7; difficult--) {
     let offset = 0;
     while (true) {
-      log(STR.collecting(difficult, offset / 50 + 1, allScores.length));
+      log(STR.collecting(difficult + 1, offset / 50 + 1, allScores.length));
 
       let doc;
       try {
