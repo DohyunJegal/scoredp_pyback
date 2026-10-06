@@ -12,6 +12,7 @@ _ALIASES: dict[str, str] = {
     "Τeλοs": "Τέλος",
     # 'Zenith'와 'ZEИITH' 충돌 방지
     "ZEИITH": "zenith2",
+    "ZENITH": "zenith2",
     # 'with you…'와 'With You' 충돌 방지
     "with you...": "withyoudd",
     "with you…": "withyoudd",
