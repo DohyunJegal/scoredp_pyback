@@ -2,14 +2,16 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Header,
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import checkpoint, get_db
-from app.models import Song, User, Score, Version, RivalPost, RivalComment
+from app.models import Song, User, Score, Version, RivalPost, RivalComment, ZasaSyncLog
 from app.schemas import SongCreate, SongUpdate, _as_utc
 from app.utils import normalize_title
 from typing import List
 import openpyxl
 import io
+import json
 import os
 import re
+import threading
 import requests
 from bs4 import BeautifulSoup
 
@@ -206,46 +208,106 @@ def import_songs(file: UploadFile = File(...), db: Session = Depends(get_db)):
 
 
 # zasa 동기화
+_sync_lock = threading.Lock()
+
 @router.post("/admin/songs/fetch-zasa")
 def sync_zasa(db: Session = Depends(get_db)):
+    if not _sync_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="이미 동기화가 진행 중입니다")
     try:
-        songs = _fetch_zasa_songs()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"zasa 크롤링 실패: {e}")
+        try:
+            songs = _fetch_zasa_songs()
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"zasa 크롤링 실패: {e}")
 
-    updated = 0
-    added = 0
-    version_cache: dict = {}
+        # key: (zasa_id, chart)
+        by_zasa = {}
+        for e in db.query(Song).filter(Song.zasa_id.isnot(None)):
+            by_zasa[(e.zasa_id, e.chart)] = e
+        # 파싱이 비정상인 경우
+        if not songs or len(songs) < len(by_zasa) * 0.5:
+            raise HTTPException(status_code=502, detail=f"zasa 파싱 결과가 비정상입니다 ({len(songs)}곡)")
 
-    for s in songs:
-        title_normalized = normalize_title(s["title"])
-        version_id = _get_or_create_version(db, s["version"], version_cache) if s["version"] else None
-        existing = db.query(Song).filter(
-            Song.title_normalized == title_normalized,
-            Song.chart == s["chart"],
-            Song.level == s["level"]
-        ).first()
-        if existing:
-            if existing.unofficial_level != s["unofficial_level"] or existing.zasa_id != s["zasa_id"] or existing.version_id != version_id:
-                existing.unofficial_level = s["unofficial_level"]
-                existing.zasa_id = s["zasa_id"]
-                existing.version_id = version_id
-                updated += 1
-        else:
-            db.add(Song(
-                title=s["title"],
-                title_normalized=title_normalized,
-                level=s["level"],
-                chart=s["chart"],
-                unofficial_level=s["unofficial_level"],
-                zasa_id=s["zasa_id"],
-                version_id=version_id,
-            ))
-            added += 1
+        updated = 0
+        added = 0
+        changes = []
+        version_cache: dict = {}
 
-    db.commit()
-    checkpoint(db)
-    return {"updated": updated, "added": added}
+        for s in songs:
+            version_id = _get_or_create_version(db, s["version"], version_cache) if s["version"] else None
+            existing = by_zasa.get((s["zasa_id"], s["chart"]))
+            if existing:
+                diff = {}
+                for field, new_value in (
+                    ("level", s["level"]),
+                    ("unofficial_level", s["unofficial_level"]),
+                    ("version_id", version_id),
+                ):
+                    old_value = getattr(existing, field)
+                    if old_value != new_value:
+                        diff[field] = [old_value, new_value]
+                        setattr(existing, field, new_value)
+                if diff:
+                    updated += 1
+                    changes.append({"id": existing.id, "title": existing.title, "chart": existing.chart, "changed": diff})
+            else:
+                song = Song(
+                    title=s["title"],
+                    title_normalized=normalize_title(s["title"]),
+                    level=s["level"],
+                    chart=s["chart"],
+                    unofficial_level=s["unofficial_level"],
+                    zasa_id=s["zasa_id"],
+                    version_id=version_id,
+                )
+                db.add(song)
+                by_zasa[(s["zasa_id"], s["chart"])] = song  # 중복 방지
+                added += 1
+                changes.append({"id": None, "title": s["title"], "chart": s["chart"], "added": True})
+
+        # 변경 내용 기록
+        db.add(ZasaSyncLog(parsed=len(songs), added=added, updated=updated,
+                           changes=json.dumps(changes, ensure_ascii=False)))
+        db.commit()
+        checkpoint(db)
+        return {
+            "updated": updated,
+            "added": added,
+            "parsed": len(songs),
+            "changes": changes,
+        }
+    finally:
+        _sync_lock.release()
+
+
+# zasa 동기화 기록 열람
+SYNC_LOGS_PAGE_SIZE = 10
+
+@router.get("/admin/songs/sync-logs")
+def get_sync_logs(page: int = Query(default=1, ge=1), db: Session = Depends(get_db)):
+    total = db.query(ZasaSyncLog).count()
+    logs = (
+        db.query(ZasaSyncLog)
+        .order_by(ZasaSyncLog.id.desc())
+        .offset((page - 1) * SYNC_LOGS_PAGE_SIZE)
+        .limit(SYNC_LOGS_PAGE_SIZE)
+        .all()
+    )
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": l.id,
+                "created_at": _as_utc(l.created_at),
+                "parsed": l.parsed,
+                "added": l.added,
+                "updated": l.updated,
+                "changes": json.loads(l.changes),
+            }
+            for l in logs
+        ],
+        "has_more": page * SYNC_LOGS_PAGE_SIZE < total,
+    }
 
 
 # 유저 목록

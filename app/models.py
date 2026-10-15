@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -16,6 +16,15 @@ class Version(Base):
     __tablename__ = "versions"
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
+
+class ZasaSyncLog(Base):
+    __tablename__ = "zasa_sync_logs"
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    parsed = Column(Integer, nullable=False)
+    added = Column(Integer, nullable=False)
+    updated = Column(Integer, nullable=False)
+    changes = Column(Text, nullable=False)  # JSON 문자열
 
 class Song(Base):
     __tablename__ = "songs"
