@@ -27,11 +27,12 @@
       searching: 'e-amusement에서 라이벌 검색 중...',
       notFound: '해당 IIDX ID를 찾을 수 없습니다.\n로그인 상태를 확인해 주세요.',
       searchError: (msg) => `검색 오류: ${msg}`,
+      loginRequired: '로그인이 필요합니다.\ne-amusement에 로그인한 뒤 다시 시도해 주세요.',
       found: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
       collecting: (i, t, n) => `수집 중... (버전 ${i}/${t})\n수집된 곡: ${n}개`,
       seriesFailed: (i) => `⚠ ${i}번째 버전 수집 실패, 재시도 리스트에 추가되었습니다.`,
-      retrying: (i, n) => `실패한 버전 재시도 중... (버전 ${i})\n수집된 곡: ${n}개`,
-      retryFailed: (i) => `⚠ ${i}번째 버전 수집 실패`,
+      retrying: (c, m, i, n) => `실패한 버전 재시도 중... (${c}/${m}회차, 버전 ${i})\n수집된 곡: ${n}개`,
+      failedVersions: (list) => `⚠ 수집 실패한 버전: ${list}`,
       noScores: '수집된 스코어가 없습니다.\n상대방의 공개 설정을 확인해 주세요.',
       uploading: (n) => `총 ${n}개 수집 완료.\n서버에 전송 중...`,
       uploadError: (msg) => `전송 오류: ${msg}`,
@@ -54,11 +55,12 @@
       searching: 'e-amusementでライバルを検索中...',
       notFound: '該当するIIDX IDが見つかりません。\nログイン状態をご確認ください。',
       searchError: (msg) => `検索エラー: ${msg}`,
+      loginRequired: 'ログインが必要です。\ne-amusementにログインしてから再度お試しください。',
       found: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
       collecting: (i, t, n) => `収集中... (バージョン ${i}/${t})\n収集した曲数: ${n}曲`,
       seriesFailed: (i) => `⚠ ${i}番目のバージョンの収集に失敗しました。再試行リストに追加しました。`,
-      retrying: (i, n) => `失敗したバージョンを再試行中... (バージョン ${i})\n収集した曲数: ${n}曲`,
-      retryFailed: (i) => `⚠ ${i}番目のバージョンの収集に失敗`,
+      retrying: (c, m, i, n) => `失敗したバージョンを再試行中... (${c}/${m}回目, バージョン ${i})\n収集した曲数: ${n}曲`,
+      failedVersions: (list) => `⚠ 収集に失敗したバージョン: ${list}`,
       noScores: '収集されたスコアがありません。\n相手の公開設定をご確認ください。',
       uploading: (n) => `合計${n}曲収集完了。\nサーバーに送信中...`,
       uploadError: (msg) => `送信エラー: ${msg}`,
@@ -81,11 +83,12 @@
       searching: 'Searching for the rival on e-amusement...',
       notFound: 'Could not find this IIDX ID.\nPlease check your login status.',
       searchError: (msg) => `Search error: ${msg}`,
+      loginRequired: 'Login required.\nPlease log in to e-amusement and try again.',
       found: (id, name) => `IIDX ID: ${id}\nDJ NAME: ${name}`,
       collecting: (i, t, n) => `Collecting... (version ${i}/${t})\nSongs collected: ${n}`,
       seriesFailed: (i) => `⚠ Version ${i} failed. Added to the retry list.`,
-      retrying: (i, n) => `Retrying failed version... (version ${i})\nSongs collected: ${n}`,
-      retryFailed: (i) => `⚠ Version ${i} failed`,
+      retrying: (c, m, i, n) => `Retrying failed version... (round ${c}/${m}, version ${i})\nSongs collected: ${n}`,
+      failedVersions: (list) => `⚠ Failed versions: ${list}`,
       noScores: "No scores were collected.\nPlease check the rival's privacy settings.",
       uploading: (n) => `Collected ${n} songs.\nUploading to server...`,
       uploadError: (msg) => `Upload error: ${msg}`,
@@ -303,7 +306,14 @@
   // 0=NO PLAY, 1=FAILED, 2=ASSIST, 3=EASY, 4=NORMAL, 5=HARD, 6=EX_HARD, 7 = FULL_COMBO
   const CLFLG_TO_CLEAR_TYPE = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7 };
 
-  const DELAY_MS = 800;
+  // 요청 간격은 랜덤(800~1000ms)
+  const DELAY_MIN_MS = 800;
+  const DELAY_MAX_MS = 1000;
+  const randomDelay = () => Math.round(DELAY_MIN_MS + Math.random() * (DELAY_MAX_MS - DELAY_MIN_MS));
+  // 실패한 버전은 사이클 단위로 재시도
+  const RETRY_CYCLES = 10;
+  const RETRY_WAIT_MS = 5000;
+
   const CHARTS = new Set(['HYPER', 'ANOTHER', 'LEGGENDARIA']);
   const SERIES_COUNT = IIDX_VERSION; // list 0 ~ IIDX_VERSION-1
 
@@ -374,16 +384,27 @@
     const ok = await collectSeries(series);
     if (!ok) failed.push(series);
     log(STR.collecting(i, SERIES_COUNT, allScores.length) + (ok ? '' : '\n' + STR.seriesFailed(i)));
-    await new Promise(r => setTimeout(r, DELAY_MS));
+    await new Promise(r => setTimeout(r, randomDelay()));
   }
 
-  // 실패한 버전은 마지막에 한 번 재시도
-  for (const series of failed) {
-    const i = series + 1;
-    log(STR.retrying(i, allScores.length));
-    const ok = await collectSeries(series);
-    log(STR.collecting(i, SERIES_COUNT, allScores.length) + (ok ? '' : '\n' + STR.retryFailed(i)));
-    await new Promise(r => setTimeout(r, DELAY_MS));
+  // 전부 실패했다면 로그아웃으로 간주
+  if (failed.length === SERIES_COUNT) {
+    logError(STR.loginRequired);
+    return;
+  }
+
+  // 실패한 버전만 사이클로 재시도
+  for (let cycle = 1; failed.length > 0 && cycle <= RETRY_CYCLES; cycle++) {
+    await new Promise(r => setTimeout(r, RETRY_WAIT_MS));
+    for (let k = failed.length - 1; k >= 0; k--) {
+      const series = failed[k];
+      log(STR.retrying(cycle, RETRY_CYCLES, series + 1, allScores.length));
+      if (await collectSeries(series)) {
+        failed.splice(k, 1);
+        console.log(`[scoredp] 버전 ${series + 1} 재시도 성공 (${cycle}회차)`);
+      }
+      if (k > 0) await new Promise(r => setTimeout(r, randomDelay()));
+    }
   }
 
   // 서버 전송
@@ -408,7 +429,8 @@
     return;
   }
 
-  log(STR.done(result.updated, allScores.length));
+  log(STR.done(result.updated, allScores.length) +
+    (failed.length ? '\n' + STR.failedVersions(failed.map(s => s + 1).sort((a, b) => a - b).join(', ')) : ''));
   footerEl.innerHTML = `
     <button id="_scoredpRvGo" style="
       all:initial;cursor:pointer;
