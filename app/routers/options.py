@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.database import get_db
 from app.models import User, Option
-from app.routers.auth import verify_password
+from app.routers.auth import authenticate
 
 router = APIRouter(prefix="/options")
 
@@ -18,13 +18,7 @@ class OptionSaveRequest(BaseModel):
 
 
 def _get_authed_user(iidx_id: str, password: str, db: Session) -> User:
-    iidx_id = iidx_id.replace("-", "")
-    user = db.query(User).filter(User.iidx_id == iidx_id).first()
-    if not user or not user.password_hash:
-        raise HTTPException(status_code=401, detail="비밀번호가 설정되지 않은 계정입니다.")
-    if not verify_password(iidx_id, password, user.password_hash):
-        raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
-    return user
+    return authenticate(db, iidx_id, password)
 
 
 @router.post("")

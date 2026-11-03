@@ -9,6 +9,10 @@ class User(Base):
     iidx_id = Column(String, unique=True, index=True, nullable=False)
     dj_name = Column(String, nullable=False)
     password_hash = Column(String, nullable=True)
+    # 연속 실패 횟수, 마지막 실패 시각, 잠금 해제 시각(UTC)
+    pw_fail_count = Column(Integer, nullable=False, default=0, server_default="0")
+    pw_last_fail_at = Column(DateTime, nullable=True)
+    pw_locked_until = Column(DateTime, nullable=True)
     scores = relationship("Score", back_populates="user")
     options = relationship("Option", back_populates="user")
 

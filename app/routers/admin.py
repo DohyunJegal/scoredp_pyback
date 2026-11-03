@@ -334,6 +334,10 @@ def reset_user_password(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다")
     user.password_hash = None
+    # 잠금 상태 해제
+    user.pw_fail_count = 0
+    user.pw_last_fail_at = None
+    user.pw_locked_until = None
     db.commit()
     checkpoint(db)
     return {"message": "초기화 완료"}

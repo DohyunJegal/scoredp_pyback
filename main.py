@@ -30,6 +30,9 @@ except OperationalError:
 for _stmt in (
     "ALTER TABLE rival_posts ADD COLUMN sp_arena VARCHAR",
     "ALTER TABLE rival_posts ADD COLUMN dp_arena VARCHAR",
+    "ALTER TABLE users ADD COLUMN pw_fail_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN pw_last_fail_at DATETIME",
+    "ALTER TABLE users ADD COLUMN pw_locked_until DATETIME",
 ):
     try:
         with engine.begin() as conn:
