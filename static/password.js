@@ -28,6 +28,9 @@
       pleaseEnter4Digits: '숫자 4자리를 입력해 주세요.',
       needCrawlerFirst: '먼저 크롤러를 실행해 스코어를 등록해 주세요.',
       pwSetSuccess: '비밀번호가 설정되었습니다!',
+      alreadySet: (name) => `${name}님은 이미 비밀번호를 설정하셨습니다.\n비밀번호를 초기화하려면 관리자에게 문의해주세요.`,
+      contactTwitter: '트위터',
+      contactKakao: '오픈카톡',
     },
     ja: {
       alreadyRunning: 'すでに実行中です。',
@@ -44,6 +47,8 @@
       pleaseEnter4Digits: '4桁の数字を入力してください。',
       needCrawlerFirst: '先にクローラーを実行してスコアを登録してください。',
       pwSetSuccess: 'パスワードが設定されました！',
+      alreadySet: (name) => `${name}さんはすでにパスワードを設定しています。\nパスワードを初期化するには、管理者にお問い合わせください。`,
+      contactTwitter: 'Twitter',
     },
     en: {
       alreadyRunning: 'Already running.',
@@ -60,6 +65,8 @@
       pleaseEnter4Digits: 'Please enter a 4-digit number.',
       needCrawlerFirst: 'Please run the crawler first to register your scores.',
       pwSetSuccess: 'Password set successfully!',
+      alreadySet: (name) => `${name} has already set a password.\nTo reset it, please contact the administrator.`,
+      contactTwitter: 'Twitter',
     },
   }[LOCALE];
 
@@ -153,6 +160,37 @@
     });
   });
 
+  // 비밀번호 초기화 문의
+  const CONTACT_LINKS = [
+    { key: 'contactTwitter', url: 'https://x.com/catchgator__' },
+    { key: 'contactKakao', url: 'https://open.kakao.com/o/sHxDbXrh', onlyLocale: 'ko' },
+  ].filter(l => l.url && (!l.onlyLocale || l.onlyLocale === LOCALE));
+
+  // 이미 비밀번호가 설정된 계정
+  function showAlreadySet() {
+    bodyEl.textContent = '';
+    const text = document.createElement('div');
+    text.style.whiteSpace = 'pre-line';
+    text.textContent = STR.alreadySet(djName);
+    bodyEl.appendChild(text);
+    if (CONTACT_LINKS.length) {
+      const row = document.createElement('div');
+      row.style.cssText = 'margin-top:8px;font-size:13px;';
+      CONTACT_LINKS.forEach((l, i) => {
+        if (i) row.append(', ');
+        const a = document.createElement('a');
+        a.href = l.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = STR[l.key];
+        a.style.color = '#1a73e8';
+        row.appendChild(a);
+      });
+      bodyEl.appendChild(row);
+    }
+    window._scoredpPwRunning = false;
+  }
+
   function showError(msg) {
     bodyEl.innerHTML = `<div style="color:#d93025;white-space:pre-line;">${msg}</div>`;
     retryBtn.style.display = '';
@@ -196,6 +234,17 @@
   } catch (e) {
     showError(STR.genericError(e.message));
     return;
+  }
+
+  // 이미 비밀번호가 있는 경우
+  try {
+    const res = await fetch(`${API_BASE}/auth/status/${encodeURIComponent(iidxId.replace(/-/g, ''))}`);
+    if (res.ok && (await res.json()).has_password) {
+      showAlreadySet();
+      return;
+    }
+  } catch (e) {
+    console.warn('[scoredp] password status check failed:', e.message);
   }
 
   // ── 비밀번호 입력 폼 ─────────────────────────────────────────────────────────
@@ -263,6 +312,10 @@
         confirmBtn.disabled = false;
         confirmBtn.style.opacity = '1';
         confirmBtn.textContent = STR.confirm;
+        return;
+      }
+      if (res.status === 409) {
+        showAlreadySet();
         return;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

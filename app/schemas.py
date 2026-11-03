@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -22,8 +23,14 @@ def _check_ascii(value: str) -> str:
     return value
 
 def _check_iidx_id(value: str) -> str:
-    if not re.fullmatch(r"\d{8}", value.replace("-", "")):
+    if not re.fullmatch(r"[0-9]{8}", value.replace("-", "")):
         raise ValueError("IIDX ID는 8자리 숫자여야 합니다.")
+    return value
+
+def _no_control_chars(value: str) -> str:
+    # 제어/서식 문자(유니코드 C*) 차단
+    if any(unicodedata.category(ch).startswith("C") for ch in value):
+        raise ValueError("사용할 수 없는 문자가 포함되어 있습니다.")
     return value
 
 def _check_arena(value: Optional[str]) -> Optional[str]:
@@ -44,6 +51,16 @@ class UploadRequest(BaseModel):
     iidx_id: str
     dj_name: str
     scores: List[ScoreItem]
+
+    @field_validator("iidx_id")
+    @classmethod
+    def _check_iidx(cls, v):
+        return _check_iidx_id(v)
+
+    @field_validator("dj_name")
+    @classmethod
+    def _check_dj_name(cls, v):
+        return _no_control_chars(v)
 
 class ScoreResponse(BaseModel):
     song_id: int

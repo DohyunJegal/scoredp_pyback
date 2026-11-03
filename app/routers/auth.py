@@ -52,6 +52,11 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="먼저 크롤링을 실행해 주세요.")
 
-    user.password_hash = hash_password(iidx_id, data.password)
+    # 최초 설정만, 재설정은 관리자가 직접 초기화
+    updated = db.query(User).filter(
+        User.id == user.id, User.password_hash.is_(None)
+    ).update({"password_hash": hash_password(iidx_id, data.password)})
     db.commit()
+    if not updated:
+        raise HTTPException(status_code=409, detail="이미 비밀번호가 설정된 계정입니다.")
     return {"message": "비밀번호가 설정되었습니다."}

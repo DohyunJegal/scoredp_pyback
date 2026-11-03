@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 
@@ -54,12 +56,16 @@ app.include_router(rivals.router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 def _serve_bookmarklet(request: Request, filename: str):
-    api_base = str(request.base_url).rstrip("/")
-    if not api_base.startswith("http://127.") and not api_base.startswith("http://localhost"):
-        api_base = api_base.replace("http://", "https://")
+    # 운영에서는 PUBLIC_API_BASE로 고정해 Host 헤더를 믿지 않음. 없으면 요청 주소 사용
+    api_base = os.environ.get("PUBLIC_API_BASE", "").rstrip("/")
+    if not api_base:
+        api_base = str(request.base_url).rstrip("/")
+        if not api_base.startswith("http://127.") and not api_base.startswith("http://localhost"):
+            api_base = api_base.replace("http://", "https://")
     with open(f"static/{filename}", encoding="utf-8") as f:
         js = f.read()
-    js = f"window._scoredpApiBase='{api_base}';\n" + js
+    # json.dumps로 문자열을 이스케이프해, 값에 따옴표가 있어도 스크립트가 깨지거나 주입되지 않음
+    js = f"window._scoredpApiBase={json.dumps(api_base)};\n" + js
     return Response(content=js, media_type="application/javascript")
 
 @app.get("/c")

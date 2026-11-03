@@ -7,6 +7,7 @@ from app.schemas import SongCreate, SongUpdate, _as_utc
 from app.utils import normalize_title
 from typing import List
 import openpyxl
+import hmac
 import io
 import json
 import os
@@ -80,7 +81,7 @@ def _get_or_create_version(db: Session, name: str, cache: dict):
 # 관리자 인증
 def verify_admin(x_admin_key: str = Header(...)):
     password = os.environ.get("ADMIN_PASSWORD")
-    if not password or x_admin_key != password:
+    if not password or not hmac.compare_digest(x_admin_key.encode(), password.encode()):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 router = APIRouter(dependencies=[Depends(verify_admin)])
@@ -320,9 +321,22 @@ def get_users(db: Session = Depends(get_db)):
             "iidx_id": u.iidx_id,
             "dj_name": u.dj_name,
             "score_count": db.query(Score).filter(Score.user_id == u.id).count(),
+            "has_password": bool(u.password_hash),
         }
         for u in users
     ]
+
+
+# 유저 비밀번호 초기화
+@router.post("/admin/users/{user_id}/reset-password")
+def reset_user_password(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="유저를 찾을 수 없습니다")
+    user.password_hash = None
+    db.commit()
+    checkpoint(db)
+    return {"message": "초기화 완료"}
 
 
 # 유저 삭제 (스코어 포함)

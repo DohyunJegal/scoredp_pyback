@@ -19,13 +19,9 @@ DJ_LEVEL_RANK = {
 def upload_scores(data: UploadRequest, db: Session = Depends(get_db)):
     iidx_id = data.iidx_id.replace('-', '')
 
-    # 유저 upsert
+    # 기존 유저 이름 갱신
     user = db.query(User).filter(User.iidx_id == iidx_id).first()
-    if not user:
-        user = User(iidx_id=iidx_id, dj_name=data.dj_name)
-        db.add(user)
-        db.flush()
-    else:
+    if user:
         user.dj_name = data.dj_name
 
     updated = 0
@@ -65,6 +61,12 @@ def upload_scores(data: UploadRequest, db: Session = Depends(get_db)):
                 item.chart
             )
             continue
+
+        # 매칭된 곡이 있을 때만 신규 생성
+        if not user:
+            user = User(iidx_id=iidx_id, dj_name=data.dj_name)
+            db.add(user)
+            db.flush()
 
         # 점수 조회
         score = db.query(Score).filter(
